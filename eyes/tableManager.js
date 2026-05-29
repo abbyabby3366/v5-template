@@ -1,29 +1,18 @@
 /**
- * tableStateManager.js — Per-table state tracking for Pretty Gaming lobby
+ * tableManager.js — Per-table state tracking for Pretty Gaming lobby
  *
- * Tracks state transitions, deck composition, and card history for each table.
- * Detects state changes that trigger EV recalculation using clean, server-provided network telemetry.
- *
- * 13-slot composition: [A, 2, 3, 4, 5, 6, 7, 8, 9, T, J, Q, K]
- * Each slot = remaining count for that rank across all suits in the shoe.
+ * Tracks state transitions, deck composition, card history, and deduced bead roads for each table.
+ * Detects state changes that trigger EV recalculation using network telemetry.
  */
 
-const { sendWhatsAppNotification } = require('../utils/whatsapp_notifier');
-const { checkTickValidations, checkWarningNeeded, checkImpossibleCard, checkGhostHands } = require('./stateValidators');
-function mapServerCodeToWinner(code) {
-  if (!code) return null;
-  if (code.startsWith('p')) return 'P';
-  if (code.startsWith('b')) return 'B';
-  if (code.startsWith('t')) return 'T';
-  return null;
-}
+const { sendWhatsAppNotification } = require("../utils/whatsapp_notifier");
+const { checkEventValidations, checkWarningNeeded, checkImpossibleCard, checkGhostHands } = require("./stateValidators");
+const { mapServerCodeToWinner } = require("./utils");
 
 // ─── Card Name → 13-slot Rank Index ─────────────────────────────────────
 // Index: 0=A, 1=2, 2=3, 3=4, 4=5, 5=6, 6=7, 7=8, 8=9, 9=T, 10=J, 11=Q, 12=K
-
 function cardRankToIndex(cardName) {
   if (!cardName || cardName === "Red") return -1;
-
   const rank = cardName.slice(0, -1).toUpperCase();
 
   switch (rank) {
@@ -47,7 +36,6 @@ function cardRankToIndex(cardName) {
 
 // ─── Fresh 8-Deck Shoe ──────────────────────────────────────────────────
 // Each rank × 4 suits × 8 decks = 32 cards per rank slot. Total = 416.
-
 function freshShoe() {
   return [32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32];
 }
@@ -56,14 +44,12 @@ function deckRemaining(composition) {
   return composition.reduce((a, b) => a + b, 0);
 }
 
-// ─── Per-Table State ─────────────────────────────────────────────────────
-
 class TableState {
   constructor(tableName) {
     this.tableName = tableName;
     this.lastState = null;
     this.lastRound = 0;
-    this.deckComposition = freshShoe(); // 13-slot
+    this.deckComposition = freshShoe();
     this.handNumber = 0;
     this.lastFinalizedRound = 0;
     this.lastPlayerCards = [];
@@ -85,8 +71,6 @@ class TableState {
   }
 }
 
-// ─── State Manager ───────────────────────────────────────────────────────
-
 class TableStateManager {
   constructor() {
     /** @type {Map<string, TableState>} */
@@ -94,10 +78,14 @@ class TableStateManager {
     this.lastResetNotificationTime = new Map();
   }
 
+  getTable(tableName) {
+    return this.tables.get(tableName) || null;
+  }
+
   /**
    * Update all table states from a scrape tick.
-   * @param {Array} tableDataArray - Array of table objects from the new memory scraper
-   * @returns {Array} - List of state-change events that need EV recalculation
+   * @param {Array} tableDataArray - Array of table objects from scrapePG
+   * @returns {Array} - List of state-change events
    */
   update(tableDataArray) {
     const events = [];
@@ -110,19 +98,20 @@ class TableStateManager {
       const ts = this.tables.get(name);
       const prevState = ts.lastState;
       const newState = table.state;
-      let newRound = table.round;
+      const newRound = table.round;
 
-      // If a new shoe has officially started (round 1), clear the deduced bead road
+      // If a new shoe has officially started, clear the deduced bead road
       if (newRound === 1 && ts.lastRound !== 1) {
         ts.deducedBeadRoad = [];
       }
-      // ── Verify deduced outcomes match server statistics history ──
-      if (ts.deducedBeadRoad && ts.deducedBeadRoad.length > 0 && table.statistics && table.statistics.length > 0) {
+
+      // Verify deduced outcomes match server statistics history
+      if (ts.deducedBeadRoad?.length > 0 && table.statistics?.length > 0) {
         let mismatchFound = false;
         let mismatchDetails = "";
 
         for (const item of ts.deducedBeadRoad) {
-          if (item && typeof item === 'object') {
+          if (item && typeof item === "object") {
             const rNum = item.round;
             if (rNum <= table.statistics.length) {
               const serverCode = table.statistics[rNum - 1];
@@ -140,25 +129,18 @@ class TableStateManager {
         if (mismatchFound) {
           const now = Date.now();
           const rateLimitKey = `${ts.tableName}:mismatch:${mismatchDetails}`;
-          const lastSent = this.lastResetNotificationTime ? (this.lastResetNotificationTime.get(rateLimitKey) || 0) : 0;
-          const isSpam = (now - lastSent) < 5 * 60 * 1000; // 5 min rate limit
-
-          const msg = `[WARNING] ${ts.tableName} Bead Road Discrepancy! ${mismatchDetails}`;
-          if (!isSpam) {
+          const lastSent = this.lastResetNotificationTime.get(rateLimitKey) || 0;
+          
+          if (now - lastSent >= 5 * 60 * 1000) {
+            const msg = `[WARNING] ${ts.tableName} Bead Road Discrepancy! ${mismatchDetails}`;
             console.log(`\x1b[31m${msg}\x1b[0m`);
             sendWhatsAppNotification(msg).catch(err => console.error("WhatsApp Notification failed:", err));
-            if (this.lastResetNotificationTime) {
-              this.lastResetNotificationTime.set(rateLimitKey, now);
-            }
+            this.lastResetNotificationTime.set(rateLimitKey, now);
           }
-          
-          // Do not auto-clear to allow dashboard visualization of the mismatch.
         }
       }
 
-
-
-      // ── Bulletproof Shoe Reset Fallbacks (e.g. if we missed "Shuffling" state transition) ──
+      // Bulletproof Shoe Reset Fallbacks
       let forceReset = false;
       let resetReason = "";
 
@@ -170,7 +152,7 @@ class TableStateManager {
         resetReason = "Shuffling detected";
       }
 
-      // ── Reset shoe instantly on Shuffling state or Fallback Triggers ──
+      // Reset shoe instantly on Shuffling state or Fallback Triggers
       if (forceReset || (newState === "Shuffling" && prevState !== "Shuffling")) {
         const reason = resetReason || "Shuffling state detected";
         this._resetShoe(ts, reason);
@@ -182,28 +164,26 @@ class TableStateManager {
           finalRound: ts.lastRound
         });
         ts.lastState = newState;
-        ts.lastRound = 0; // Prevent second trigger when newRound transitions to 1 in the next tick
+        ts.lastRound = 0; // Prevent second trigger when newRound transitions to 1 in next tick
         continue;
       }
 
-      // ── Process hand completion cleanly when server transitions to Result ──
+      // Process hand completion cleanly when server transitions to Result
       const isResultState = newState.startsWith("Result");
-      const isAlreadyFinalized = ts.deducedBeadRoad && ts.deducedBeadRoad.some(item => item && item.round === newRound);
-      const hasCards = (table.playerCards && table.playerCards.length > 0) || (table.bankerCards && table.bankerCards.length > 0);
+      const isAlreadyFinalized = ts.deducedBeadRoad?.some(item => item && item.round === newRound);
+      const hasCards = (table.playerCards?.length > 0) || (table.bankerCards?.length > 0);
+
       if (isResultState && newRound > ts.lastFinalizedRound && newRound > 0 && hasCards) {
         if (isAlreadyFinalized) {
-          const msg = `[WARNING] ${ts.tableName}: Double-deduction attempt guarded for completed round ${newRound}! Round already present in deduced bead road.`;
           const rateLimitKey = `${ts.tableName}:double_deduct:${newRound}`;
           const now = Date.now();
-          const lastSent = this.lastResetNotificationTime ? (this.lastResetNotificationTime.get(rateLimitKey) || 0) : 0;
-          const isSpam = (now - lastSent) < 5 * 60 * 1000;
+          const lastSent = this.lastResetNotificationTime.get(rateLimitKey) || 0;
 
-          if (!isSpam) {
+          if (now - lastSent >= 5 * 60 * 1000) {
+            const msg = `[WARNING] ${ts.tableName}: Double-deduction attempt guarded for completed round ${newRound}!`;
             console.log(`\x1b[31m${msg}\x1b[0m`);
             sendWhatsAppNotification(msg).catch(err => console.error("WhatsApp Notification failed:", err));
-            if (this.lastResetNotificationTime) {
-              this.lastResetNotificationTime.set(rateLimitKey, now);
-            }
+            this.lastResetNotificationTime.set(rateLimitKey, now);
           }
         } else {
           // Extract cards and subtract them from deck composition
@@ -234,7 +214,7 @@ class TableStateManager {
           } else {
             ts.consecutiveZeroCardHands = 0;
             if ((cardsSubtracted < 4 || cardsSubtracted > 6) && !corruptedReason) {
-              corruptedReason = `Invalid state: mathematically impossible cards count (${cardsSubtracted}) for completed round ${newRound}`;
+              corruptedReason = `Invalid state: mathematically impossible cards count (${cardsSubtracted}) for round ${newRound}`;
             }
           }
 
@@ -253,8 +233,8 @@ class TableStateManager {
             });
           } else {
             if (table.winner) {
-              ts.deducedBeadRoad.push({ 
-                round: newRound, 
+              ts.deducedBeadRoad.push({
+                round: newRound,
                 winner: table.winner,
                 playerCards: table.playerCards || [],
                 bankerCards: table.bankerCards || []
@@ -278,22 +258,22 @@ class TableStateManager {
         }
       }
 
-      // ── External Validations ──
-      const tickInvalidReason = checkTickValidations(ts, newRound, newState, prevState);
+      // External Validations
+      const invalidReason = checkEventValidations(ts, newRound, newState, prevState);
 
       if (ts.restored) {
         ts.restored = false;
-        if (!tickInvalidReason && newRound >= ts.lastRound) {
+        if (!invalidReason && newRound >= ts.lastRound) {
           console.log(`\x1b[36m[STATE] ${name}: Validated (saved R${ts.lastRound} → live R${newRound})\x1b[0m`);
         }
       }
 
-      if (tickInvalidReason) {
-        this._resetShoe(ts, tickInvalidReason);
+      if (invalidReason) {
+        this._resetShoe(ts, invalidReason);
         events.push({
           type: "SHOE_RESET",
           tableName: name,
-          reason: tickInvalidReason,
+          reason: invalidReason,
           finalRound: ts.lastRound
         });
       } else {
@@ -309,7 +289,7 @@ class TableStateManager {
         }
       }
 
-      // ── Dispatch generic state transitions ──
+      // Dispatch generic state transitions
       if (newState !== prevState && !events.some(e => e.tableName === name)) {
         events.push({
           type: "STATE_CHANGE",
@@ -331,14 +311,13 @@ class TableStateManager {
   }
 
   _resetShoe(ts, reason) {
-    // Append the last round if not already mentioned in the reason
     const roundInfo = (ts.lastRound > 0 && !reason.includes("decreased from") && !reason.includes("reset from"))
       ? `, last round was ${ts.lastRound}`
-      : '';
+      : "";
     const msg = `[SHOE] ${ts.tableName}: Reset to fresh shoe (Reason: ${reason}${roundInfo})`;
     const rateLimitKey = `${ts.tableName}:${reason}`;
     const now = Date.now();
-    const lastSent = this.lastResetNotificationTime ? (this.lastResetNotificationTime.get(rateLimitKey) || 0) : 0;
+    const lastSent = this.lastResetNotificationTime.get(rateLimitKey) || 0;
     const isSpam = (now - lastSent) < 15 * 60 * 1000;
 
     ts.deckComposition = freshShoe();
@@ -351,8 +330,7 @@ class TableStateManager {
     ts.lastPlayerCards = [];
     ts.lastBankerCards = [];
     ts.lastEvResult = null;
-    
-    // Clear deduced road on manual resets, fresh shoe commands, shuffles, or server stats resets
+
     if (reason && (
       reason.includes("Manual reset") ||
       reason.includes("fresh shoe") ||
@@ -363,8 +341,8 @@ class TableStateManager {
     )) {
       ts.deducedBeadRoad = [];
     }
-    
-    if (reason && reason.startsWith('Invalid state')) {
+
+    if (reason && reason.startsWith("Invalid state")) {
       ts.lastErrorResetReason = reason;
       ts.lastErrorResetTime = Date.now();
     } else {
@@ -375,19 +353,11 @@ class TableStateManager {
     if (!isSpam) {
       console.log(`\x1b[33m${msg}\x1b[0m`);
     }
-    
-    if (reason.startsWith('Invalid state')) {
-      if (!isSpam) {
-        sendWhatsAppNotification(msg).catch(err => console.error("WhatsApp Notification failed:", err));
-        if (this.lastResetNotificationTime) {
-          this.lastResetNotificationTime.set(rateLimitKey, now);
-        }
-      }
-    }
-  }
 
-  getTable(tableName) {
-    return this.tables.get(tableName) || null;
+    if (reason.startsWith("Invalid state") && !isSpam) {
+      sendWhatsAppNotification(msg).catch(err => console.error("WhatsApp Notification failed:", err));
+      this.lastResetNotificationTime.set(rateLimitKey, now);
+    }
   }
 
   serialize() {
@@ -437,9 +407,9 @@ class TableStateManager {
       ts.consecutiveZeroCardHands = saved.consecutiveZeroCardHands || 0;
       ts.lastErrorResetReason = saved.lastErrorResetReason || null;
       ts.lastErrorResetTime = saved.lastErrorResetTime || null;
-      
+
       ts.deducedBeadRoad = (saved.deducedBeadRoad || []).map(item => {
-        if (item && typeof item === 'object') {
+        if (item && typeof item === "object") {
           return {
             ...item,
             playerCards: (item.playerCards || []).map(normalizeCard),
@@ -456,4 +426,9 @@ class TableStateManager {
   }
 }
 
-module.exports = { TableStateManager, cardRankToIndex, freshShoe, deckRemaining };
+module.exports = {
+  TableStateManager,
+  cardRankToIndex,
+  freshShoe,
+  deckRemaining
+};

@@ -99,4 +99,20 @@ function calculateEV(composition, config = {}) {
     return null;
   }
 }
-module.exports = { calculateEV };
+function processEVForEvents(events, dynamicConfig = {}) {
+  for (const event of events) {
+    if (event.type !== "HAND_COMPLETE" && event.type !== "STATE_CHANGE") continue;
+
+    // Skip EV calculation if shoe was reset in the same tick
+    const hasReset = events.some(e => e.type === "SHOE_RESET" && e.tableName === event.tableName);
+    if (hasReset) continue;
+
+    const ts = event.tableState;
+    const evResult = calculateEV(event.deckComposition, dynamicConfig);
+    if (evResult) {
+      ts.lastEvResult = evResult;
+    }
+  }
+}
+
+module.exports = { calculateEV, processEVForEvents };

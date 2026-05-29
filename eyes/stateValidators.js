@@ -5,7 +5,7 @@
  * if a shoe reset is required, or null if the state is valid.
  */
 
-function checkTickValidations(ts, newRound, newState, prevState) {
+function checkEventValidations(ts, newRound, newState, prevState) {
   // 1. Validate restored state round drop
   if (ts.restored && newRound < ts.lastRound) {
     return `Stale state: round went from ${ts.lastRound} → ${newRound} after restore`;
@@ -52,7 +52,7 @@ function checkGhostHands(consecutiveZeroCardHands) {
 }
 
 module.exports = {
-  checkTickValidations,
+  checkEventValidations,
   checkWarningNeeded,
   checkImpossibleCard,
   checkGhostHands

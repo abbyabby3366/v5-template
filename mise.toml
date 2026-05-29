@@ -7,7 +7,7 @@ outputs = ["baccarat_analyzer_v3/target/release/analyzer_bin.exe"]
 [tasks.eyes]
 description = "Build analyzer → Run Eyes"
 depends = ["build:rust"]
-run = "node eyes/launch_eyes_PG_hippo.js"
+run = "node eyes/launcher.js"
 
 [tasks.central]
 description = "Run the Central Dashboard server"

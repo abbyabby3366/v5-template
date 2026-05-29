@@ -129,6 +129,106 @@
     }
   }
 
+  const stateMapping = {
+    "CountDown": "Waiting for Bets",
+    "showResult": "Dealing",
+    "PayOut": "Result",
+    "Shuffle": "Shuffling"
+  };
+
+  function mapServerCodeToWinner(code) {
+    if (!code) return null;
+    const c = code.toLowerCase();
+    if (c.startsWith('p')) return 'P';
+    if (c.startsWith('b')) return 'B';
+    if (c.startsWith('t')) return 'T';
+    return null;
+  }
+
+  function getParsedTable(roomId) {
+    const entry = window.__tableStatesCache[roomId];
+    if (!entry) return null;
+
+    const name = window.__roomToNameMap[roomId] || roomId;
+    const stats = entry.statistics || [];
+    
+    const pWins = stats.filter(c => c.startsWith('p')).length;
+    const bWins = stats.filter(c => c.startsWith('b')).length;
+    const tWins = stats.filter(c => c.startsWith('t')).length;
+
+    let roundNumber = entry.round || 0;
+    let state = stateMapping[entry.status] || entry.status || "Waiting for Bets";
+    let winner = null;
+
+    if (entry.status === "PayOut") {
+      if (entry.result && entry.result.rsBc) {
+        const rs = entry.result.rsBc;
+        const pPoints = rs.player123;
+        const bPoints = rs.banker123;
+        if (pPoints !== undefined && bPoints !== undefined) {
+          if (pPoints > bPoints) {
+            state = "Result (Player Win)";
+            winner = "P";
+          } else if (pPoints < bPoints) {
+            state = "Result (Banker Win)";
+            winner = "B";
+          } else {
+            state = "Result (Tie Win)";
+            winner = "T";
+          }
+        }
+      }
+      if (!winner && stats.length >= roundNumber) {
+        const serverCode = stats[roundNumber - 1];
+        winner = mapServerCodeToWinner(serverCode);
+        if (winner === "P") state = "Result (Player Win)";
+        else if (winner === "B") state = "Result (Banker Win)";
+        else if (winner === "T") state = "Result (Tie Win)";
+      }
+    }
+
+    const playerCards = [];
+    const bankerCards = [];
+    const allCards = [];
+
+    if (entry.result && entry.result.rsBc) {
+      const rs = entry.result.rsBc;
+      const normalizeCard = (c) => {
+        if (!c || c === "null" || c === "Red") return null;
+        if (c.startsWith("10")) return "T" + c.slice(2);
+        return c;
+      };
+
+      [rs.player_1, rs.player_2, rs.player_3].forEach(c => {
+        const norm = normalizeCard(c);
+        if (norm) {
+          playerCards.push(norm);
+          allCards.push(norm);
+        }
+      });
+      [rs.banker_1, rs.banker_2, rs.banker_3].forEach(c => {
+        const norm = normalizeCard(c);
+        if (norm) {
+          bankerCards.push(norm);
+          allCards.push(norm);
+        }
+      });
+    }
+
+    return {
+      tableName: name,
+      state: state,
+      timer: entry.timeLeft !== undefined ? entry.timeLeft : -1,
+      round: roundNumber,
+      wins: { P: pWins, B: bWins, T: tWins },
+      playerCards: playerCards,
+      bankerCards: bankerCards,
+      allCards: allCards,
+      winner: winner,
+      statistics: stats
+    };
+  }
+
   function savePacketToCache(packet) {
     if (!packet || !packet.roomId || !packet.status) return;
     if (!window.__activeRooms.has(packet.roomId)) return;
@@ -161,6 +261,15 @@
 
     if (statusChanged && packet.status === "CountDown") {
       syncSourceBeadRoad(packet.roomId);
+    }
+
+    if (typeof window.onTableStateUpdate === "function") {
+      try {
+        const parsed = getParsedTable(packet.roomId);
+        if (parsed) {
+          window.onTableStateUpdate(parsed).catch(() => {});
+        }
+      } catch (e) {}
     }
   }
 
