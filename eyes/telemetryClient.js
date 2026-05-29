@@ -82,7 +82,7 @@ function sendBetSignal(ts, tableName, stateManager) {
     instanceID: "PG_Eyes",
     tableNumber: tableName,
     status: { setup: "READY", autoBet: true, gameState: "WAITING_FOR_BETS" },
-    ocr: { roundNumber: String(ts.lastRound) },
+    ocr: { roundNumber: String(ts.round) },
     metrics: { deckRemaining: ts.remaining },
     mathematics: {
       deckComposition: ts.deckComposition,
@@ -139,7 +139,7 @@ function handleTelemetrySignals(events, stateManager) {
     if (hasReset) continue;
 
     // 3. Bet signals
-    if (ts.lastState !== "Waiting for Bets") continue;
+    if (ts.state !== "Waiting for Bets") continue;
     if (!ts.lastEvResult || !ts.lastEvResult.best) continue;
 
     const maxEv = Math.max(
@@ -149,12 +149,12 @@ function handleTelemetrySignals(events, stateManager) {
     );
 
     // Warn if EV is abnormally high (potential deck sync issue)
-    if (maxEv > 0.01 && ts.lastWarnedEvRound !== ts.lastRound) {
+    if (maxEv > 0.01 && ts.lastWarnedEvRound !== ts.round) {
       const remaining = event.deckRemaining !== undefined ? event.deckRemaining : ts.remaining;
-      const msg = `[WARNING] ${event.tableName} (Round ${ts.lastRound}): Abnormal EV detected (${(maxEv * 100).toFixed(3)}% > 1.0%). Deck size might be out of sync (Remaining: ${remaining})`;
+      const msg = `[WARNING] ${event.tableName} (Round ${ts.round}): Abnormal EV detected (${(maxEv * 100).toFixed(3)}% > 1.0%). Deck size might be out of sync (Remaining: ${remaining})`;
       console.log(`\x1b[33m${msg}\x1b[0m`);
       sendWhatsAppNotification(msg).catch(() => {});
-      ts.lastWarnedEvRound = ts.lastRound;
+      ts.lastWarnedEvRound = ts.round;
     }
 
     if (ts.currentBetId) continue; // Already pending

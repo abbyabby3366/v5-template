@@ -1,18 +1,28 @@
 /**
- * tableManager.js — Per-table state tracking for Pretty Gaming lobby
+ * tableManager.js — Per-table state management and event dispatch
  *
- * Tracks state transitions, deck composition, card history, and deduced bead roads for each table.
- * Detects state changes that trigger EV recalculation using network telemetry.
+ * Owns TableState lifecycle: creation, deck subtraction, shoe resets, and serialization.
+ * Delegates all validation decisions to stateValidators.js.
+ * Emits HAND_COMPLETE, SHOE_RESET, and STATE_CHANGE events for downstream consumers.
  */
 
 const { sendWhatsAppNotification } = require("../utils/whatsapp_notifier");
-const { checkEventValidations, checkWarningNeeded, checkImpossibleCard, checkGhostHands } = require("./stateValidators");
-const { mapServerCodeToWinner } = require("./utils");
+const {
+  checkEventValidations,
+  checkShoeResetNeeded,
+  isResultState,
+  checkWarningNeeded,
+  checkImpossibleCard,
+  checkGhostHands,
+  checkCardCount,
+  checkBeadRoadMismatch,
+  isInvalidStateReset,
+} = require("./stateValidators");
 
 // ─── Card Name → 13-slot Rank Index ─────────────────────────────────────
 // Index: 0=A, 1=2, 2=3, 3=4, 4=5, 5=6, 6=7, 7=8, 8=9, 9=T, 10=J, 11=Q, 12=K
 function cardRankToIndex(cardName) {
-  if (!cardName || cardName === "Red") return -1;
+  if (!cardName) return -1;
   const rank = cardName.slice(0, -1).toUpperCase();
 
   switch (rank) {
@@ -45,29 +55,34 @@ function deckRemaining(composition) {
 }
 
 class TableState {
-  constructor(tableName) {
+  constructor(tableName, tableId = null) {
     this.tableName = tableName;
-    this.lastState = null;
-    this.lastRound = 0;
+    this.tableId = tableId;
+    this.roundId = null;
+    this.state = null;
+    this.round = 0;
     this.deckComposition = freshShoe();
     this.handNumber = 0;
     this.lastFinalizedRound = 0;
-    this.lastPlayerCards = [];
-    this.lastBankerCards = [];
     this.lastEvResult = null;
-    this.bufferedCards = { player: [], banker: [] };
     this.currentBetId = null;
     this.restored = false;
     this.hasWarnedAhead = false;
     this.consecutiveZeroCardHands = 0;
-    this.handFinalizedForCycle = false;
     this.lastErrorResetReason = null;
     this.lastErrorResetTime = null;
-    this.deducedBeadRoad = [];
+    this.handHistory = [];
+    this.lastAlertedMismatchRound = null;
   }
 
   get remaining() {
     return deckRemaining(this.deckComposition);
+  }
+
+  /** Derive last hand's cards from handHistory */
+  get lastHand() {
+    if (this.handHistory.length === 0) return null;
+    return this.handHistory[this.handHistory.length - 1];
   }
 }
 
@@ -83,8 +98,8 @@ class TableStateManager {
   }
 
   /**
-   * Update all table states from a scrape tick.
-   * @param {Array} tableDataArray - Array of table objects from scrapePG
+   * Update table states from incoming interceptor events.
+   * @param {Array} tableDataArray - Array of table objects pushed by the browser interceptor
    * @returns {Array} - List of state-change events
    */
   update(tableDataArray) {
@@ -93,98 +108,98 @@ class TableStateManager {
     for (const table of tableDataArray) {
       const name = table.tableName;
       if (!this.tables.has(name)) {
-        this.tables.set(name, new TableState(name));
+        this.tables.set(name, new TableState(name, table.tableId || null));
       }
       const ts = this.tables.get(name);
-      const prevState = ts.lastState;
+      const prevState = ts.state;
       const newState = table.state;
       const newRound = table.round;
+      const newRoundId = table.roundId || null;
 
-      // If a new shoe has officially started, clear the deduced bead road
-      if (newRound === 1 && ts.lastRound !== 1) {
-        ts.deducedBeadRoad = [];
-      }
+      // Update tableId if provided
+      if (table.tableId) ts.tableId = table.tableId;
 
-      // Verify deduced outcomes match server statistics history
-      if (ts.deducedBeadRoad?.length > 0 && table.statistics?.length > 0) {
-        let mismatchFound = false;
-        let mismatchDetails = "";
-
-        for (const item of ts.deducedBeadRoad) {
-          if (item && typeof item === "object") {
-            const rNum = item.round;
-            if (rNum <= table.statistics.length) {
-              const serverCode = table.statistics[rNum - 1];
-              const serverWinner = mapServerCodeToWinner(serverCode);
-
-              if (serverWinner && item.winner !== serverWinner) {
-                mismatchFound = true;
-                mismatchDetails = `Round ${rNum} mismatch: Deduced ${item.winner} vs Server ${serverWinner}`;
-                break;
-              }
-            }
-          }
-        }
-
-        if (mismatchFound) {
-          const now = Date.now();
-          const rateLimitKey = `${ts.tableName}:mismatch:${mismatchDetails}`;
-          const lastSent = this.lastResetNotificationTime.get(rateLimitKey) || 0;
-          
-          if (now - lastSent >= 5 * 60 * 1000) {
-            const msg = `[WARNING] ${ts.tableName} Bead Road Discrepancy! ${mismatchDetails}`;
-            console.log(`\x1b[31m${msg}\x1b[0m`);
-            sendWhatsAppNotification(msg).catch(err => console.error("WhatsApp Notification failed:", err));
-            this.lastResetNotificationTime.set(rateLimitKey, now);
-          }
+      // 1. Handle stale restored state
+      if (ts.restored) {
+        ts.restored = false;
+        const roundIdMismatch = ts.roundId && newRoundId && ts.roundId !== newRoundId;
+        const roundDrop = newRound < ts.round;
+        if (roundDrop || roundIdMismatch) {
+          const reason = `Invalid state: Stale state restored (saved R${ts.round}/ID ${ts.roundId || "N/A"} -> live R${newRound}/ID ${newRoundId || "N/A"})`;
+          this.#resetShoe(ts, reason);
+          events.push({
+            type: "SHOE_RESET",
+            tableName: name,
+            reason: reason,
+            finalRound: ts.round
+          });
+          ts.state = newState;
+          ts.round = newRound;
+          if (newRoundId) ts.roundId = newRoundId;
+          continue;
+        } else {
+          console.log(`\x1b[36m[STATE] ${name}: Validated restored state (saved R${ts.round} → live R${newRound})\x1b[0m`);
         }
       }
 
-      // Bulletproof Shoe Reset Fallbacks
-      let forceReset = false;
-      let resetReason = "";
+      // 2. Detect implicit or explicit new shoe
+      const significantRoundDrop = newRound < ts.round - 1 && ts.round > 1;
+      const shoeChangedByRound = newRound === 1 && ts.round > 1;
+      const shoeChangedByRoundId = newRoundId && ts.roundId && newRoundId !== ts.roundId && newRound <= 1;
 
-      if (newRound === 1 && ts.lastRound > 10) {
-        forceReset = true;
-        resetReason = `Round number decreased from ${ts.lastRound} to 1`;
-      } else if (table.statistics && table.statistics.length === 0 && ts.lastRound > 1 && newState !== "Shuffling") {
-        forceReset = true;
-        resetReason = "Shuffling detected";
-      }
+      const { forceReset, resetReason } = checkShoeResetNeeded(ts, newRound, newState, table.statistics);
+      const isImplicitShuffle = significantRoundDrop || shoeChangedByRound || shoeChangedByRoundId;
 
-      // Reset shoe instantly on Shuffling state or Fallback Triggers
-      if (forceReset || (newState === "Shuffling" && prevState !== "Shuffling")) {
-        const reason = resetReason || "Shuffling state detected";
-        this._resetShoe(ts, reason);
+      if (forceReset || isImplicitShuffle || (newState === "Shuffling" && prevState !== "Shuffling")) {
+        const reason = resetReason || (newState === "Shuffling" ? "Shuffling state detected" : `Implicit shoe change detected (R${ts.round} -> R${newRound})`);
+        this.#resetShoe(ts, reason);
         events.push({
           type: "SHOE_RESET",
           tableName: name,
           reason: reason,
           isActualShuffle: true,
-          finalRound: ts.lastRound
+          finalRound: ts.round
         });
-        ts.lastState = newState;
-        ts.lastRound = 0; // Prevent second trigger when newRound transitions to 1 in next tick
+        ts.state = newState;
+        ts.round = newRound;
+        if (newRoundId) ts.roundId = newRoundId;
+        ts.handHistory = [];
         continue;
       }
 
-      // Process hand completion cleanly when server transitions to Result
-      const isResultState = newState.startsWith("Result");
-      const isAlreadyFinalized = ts.deducedBeadRoad?.some(item => item && item.round === newRound);
+      // 3. Prevent minor out-of-order round backwards drops
+      if (newRound < ts.round) {
+        console.warn(`\x1b[33m[STATE] ${name}: Stale/out-of-order round drop ignored (live R${newRound} < current R${ts.round})\x1b[0m`);
+        continue;
+      }
+
+      // Update roundId tracking
+      if (newRoundId) ts.roundId = newRoundId;
+
+      // Verify hand history outcomes match server statistics
+      const { mismatchFound, mismatchDetails, mismatchRound } = checkBeadRoadMismatch(ts.handHistory, table.statistics);
+      if (mismatchFound && ts.lastAlertedMismatchRound !== mismatchRound) {
+        const msg = `[WARNING] ${ts.tableName} Hand History Discrepancy! ${mismatchDetails}`;
+        console.log(`\x1b[31m${msg}\x1b[0m`);
+        sendWhatsAppNotification(msg).catch(err => console.error("WhatsApp Notification failed:", err));
+        ts.lastAlertedMismatchRound = mismatchRound;
+      }
+
+      // 4. Missed Round (Gap) Detection
+      if (ts.lastFinalizedRound > 0 && newRound > ts.lastFinalizedRound + 1) {
+        console.warn(`\x1b[33m[STATE] ${name}: Missed round(s) detected between last finalized R${ts.lastFinalizedRound} and live R${newRound}. Continuing as requested...\x1b[0m`);
+      }
+
+      // Process hand completion when server transitions to Result
+      const isAlreadyFinalized = ts.handHistory?.some(item => item && item.round === newRound);
       const hasCards = (table.playerCards?.length > 0) || (table.bankerCards?.length > 0);
 
-      if (isResultState && newRound > ts.lastFinalizedRound && newRound > 0 && hasCards) {
+      if (isResultState(newState) && newRound > ts.lastFinalizedRound && newRound > 0 && hasCards) {
         if (isAlreadyFinalized) {
-          const rateLimitKey = `${ts.tableName}:double_deduct:${newRound}`;
-          const now = Date.now();
-          const lastSent = this.lastResetNotificationTime.get(rateLimitKey) || 0;
-
-          if (now - lastSent >= 5 * 60 * 1000) {
-            const msg = `[WARNING] ${ts.tableName}: Double-deduction attempt guarded for completed round ${newRound}!`;
-            console.log(`\x1b[31m${msg}\x1b[0m`);
-            sendWhatsAppNotification(msg).catch(err => console.error("WhatsApp Notification failed:", err));
-            this.lastResetNotificationTime.set(rateLimitKey, now);
-          }
+          this.#rateLimitedWarning(
+            `${ts.tableName}:double_deduct:${newRound}`,
+            `[WARNING] ${ts.tableName}: Double-deduction attempt guarded for completed round ${newRound}!`
+          );
         } else {
           // Extract cards and subtract them from deck composition
           let cardsSubtracted = 0;
@@ -213,27 +228,26 @@ class TableStateManager {
             }
           } else {
             ts.consecutiveZeroCardHands = 0;
-            if ((cardsSubtracted < 4 || cardsSubtracted > 6) && !corruptedReason) {
-              corruptedReason = `Invalid state: mathematically impossible cards count (${cardsSubtracted}) for round ${newRound}`;
+            const countReason = checkCardCount(cardsSubtracted, newRound);
+            if (countReason && !corruptedReason) {
+              corruptedReason = countReason;
             }
           }
 
           ts.handNumber++;
-          ts.lastPlayerCards = table.playerCards.slice();
-          ts.lastBankerCards = table.bankerCards.slice();
           ts.lastFinalizedRound = newRound;
 
           if (corruptedReason) {
-            this._resetShoe(ts, corruptedReason);
+            this.#resetShoe(ts, corruptedReason);
             events.push({
               type: "SHOE_RESET",
               tableName: name,
               reason: corruptedReason,
-              finalRound: ts.lastRound
+              finalRound: ts.round
             });
           } else {
             if (table.winner) {
-              ts.deducedBeadRoad.push({
+              ts.handHistory.push({
                 round: newRound,
                 winner: table.winner,
                 playerCards: table.playerCards || [],
@@ -261,27 +275,19 @@ class TableStateManager {
       // External Validations
       const invalidReason = checkEventValidations(ts, newRound, newState, prevState);
 
-      if (ts.restored) {
-        ts.restored = false;
-        if (!invalidReason && newRound >= ts.lastRound) {
-          console.log(`\x1b[36m[STATE] ${name}: Validated (saved R${ts.lastRound} → live R${newRound})\x1b[0m`);
-        }
-      }
-
       if (invalidReason) {
-        this._resetShoe(ts, invalidReason);
+        this.#resetShoe(ts, invalidReason);
         events.push({
           type: "SHOE_RESET",
           tableName: name,
           reason: invalidReason,
-          finalRound: ts.lastRound
+          finalRound: ts.round
         });
       } else {
         if (checkWarningNeeded(ts, newRound)) {
           if (!ts.hasWarnedAhead) {
             const msg = `[WARNING] ${name}: recorded hands (${ts.handNumber}) is ahead of table UI round (${newRound}). Awaiting correction.`;
-            console.log(`\x1b[33m${msg}\x1b[0m`);
-            sendWhatsAppNotification(msg).catch(err => console.error("WhatsApp Notification failed:", err));
+            this.#rateLimitedWarning(`${ts.tableName}:ahead_warning`, msg, 10 * 60 * 1000);
             ts.hasWarnedAhead = true;
           }
         } else if (ts.handNumber <= newRound) {
@@ -303,46 +309,39 @@ class TableStateManager {
         });
       }
 
-      ts.lastState = newState;
-      ts.lastRound = newRound;
+      ts.state = newState;
+      ts.round = newRound;
     }
 
     return events;
   }
 
-  _resetShoe(ts, reason) {
-    const roundInfo = (ts.lastRound > 0 && !reason.includes("decreased from") && !reason.includes("reset from"))
-      ? `, last round was ${ts.lastRound}`
-      : "";
-    const msg = `[SHOE] ${ts.tableName}: Reset to fresh shoe (Reason: ${reason}${roundInfo})`;
-    const rateLimitKey = `${ts.tableName}:${reason}`;
+  #rateLimitedWarning(rateLimitKey, msg, cooldownMs = 5 * 60 * 1000) {
     const now = Date.now();
     const lastSent = this.lastResetNotificationTime.get(rateLimitKey) || 0;
-    const isSpam = (now - lastSent) < 15 * 60 * 1000;
+    if (now - lastSent >= cooldownMs) {
+      console.log(`\x1b[31m${msg}\x1b[0m`);
+      sendWhatsAppNotification(msg).catch(err => console.error("WhatsApp Notification failed:", err));
+      this.lastResetNotificationTime.set(rateLimitKey, now);
+    }
+  }
+
+  #resetShoe(ts, reason) {
+    const roundInfo = (ts.round > 0 && !reason.includes("decreased from") && !reason.includes("reset from"))
+      ? `, last round was ${ts.round}`
+      : "";
+    const msg = `[SHOE] ${ts.tableName}: Reset to fresh shoe (Reason: ${reason}${roundInfo})`;
 
     ts.deckComposition = freshShoe();
     ts.handNumber = 0;
     ts.lastFinalizedRound = 0;
     ts.hasWarnedAhead = false;
     ts.consecutiveZeroCardHands = 0;
-    ts.handFinalizedForCycle = false;
-    ts.bufferedCards = { player: [], banker: [] };
-    ts.lastPlayerCards = [];
-    ts.lastBankerCards = [];
     ts.lastEvResult = null;
+    ts.handHistory = [];
+    ts.lastAlertedMismatchRound = null;
 
-    if (reason && (
-      reason.includes("Manual reset") ||
-      reason.includes("fresh shoe") ||
-      reason.includes("starting fresh") ||
-      reason.includes("Server statistics") ||
-      reason.includes("Shuffling") ||
-      reason.includes("Fresh round")
-    )) {
-      ts.deducedBeadRoad = [];
-    }
-
-    if (reason && reason.startsWith("Invalid state")) {
+    if (isInvalidStateReset(reason)) {
       ts.lastErrorResetReason = reason;
       ts.lastErrorResetTime = Date.now();
     } else {
@@ -350,13 +349,10 @@ class TableStateManager {
       ts.lastErrorResetTime = null;
     }
 
-    if (!isSpam) {
-      console.log(`\x1b[33m${msg}\x1b[0m`);
-    }
+    console.log(`\x1b[33m${msg}\x1b[0m`);
 
-    if (reason.startsWith("Invalid state") && !isSpam) {
+    if (isInvalidStateReset(reason)) {
       sendWhatsAppNotification(msg).catch(err => console.error("WhatsApp Notification failed:", err));
-      this.lastResetNotificationTime.set(rateLimitKey, now);
     }
   }
 
@@ -365,20 +361,21 @@ class TableStateManager {
     for (const [name, ts] of this.tables) {
       data[name] = {
         tableName: ts.tableName,
-        lastState: ts.lastState,
-        lastRound: ts.lastRound,
+        tableId: ts.tableId,
+        roundId: ts.roundId,
+        state: ts.state,
+        round: ts.round,
         deckComposition: ts.deckComposition,
         handNumber: ts.handNumber,
         lastFinalizedRound: ts.lastFinalizedRound,
-        lastPlayerCards: ts.lastPlayerCards,
-        lastBankerCards: ts.lastBankerCards,
         lastEvResult: ts.lastEvResult,
-        bufferedCards: ts.bufferedCards,
         currentBetId: ts.currentBetId,
         consecutiveZeroCardHands: ts.consecutiveZeroCardHands,
         lastErrorResetReason: ts.lastErrorResetReason,
         lastErrorResetTime: ts.lastErrorResetTime,
-        deducedBeadRoad: ts.deducedBeadRoad,
+        handHistory: ts.handHistory,
+        hasWarnedAhead: ts.hasWarnedAhead,
+        lastAlertedMismatchRound: ts.lastAlertedMismatchRound,
       };
     }
     return data;
@@ -387,28 +384,30 @@ class TableStateManager {
   restore(data) {
     if (!data || typeof data !== "object") return;
     const normalizeCard = (c) => {
-      if (!c || c === "null" || c === "Red") return c;
+      if (!c || c === "null") return c;
       if (c.startsWith("10")) return "T" + c.slice(2);
       return c;
     };
 
     for (const [name, saved] of Object.entries(data)) {
-      const ts = new TableState(name);
-      ts.lastState = saved.lastState || null;
-      ts.lastRound = saved.lastRound || 0;
+      const ts = new TableState(name, saved.tableId || null);
+      ts.roundId = saved.roundId || null;
+      ts.state = saved.state || saved.lastState || null;
+      ts.round = saved.round || saved.lastRound || 0;
       ts.deckComposition = saved.deckComposition || freshShoe();
       ts.handNumber = saved.handNumber || 0;
-      ts.lastFinalizedRound = saved.lastFinalizedRound || saved.lastRound || 0;
-      ts.lastPlayerCards = (saved.lastPlayerCards || []).map(normalizeCard);
-      ts.lastBankerCards = (saved.lastBankerCards || []).map(normalizeCard);
+      ts.lastFinalizedRound = saved.lastFinalizedRound || saved.round || saved.lastRound || 0;
       ts.lastEvResult = saved.lastEvResult || null;
-      ts.bufferedCards = saved.bufferedCards || { player: [], banker: [] };
       ts.currentBetId = saved.currentBetId || null;
       ts.consecutiveZeroCardHands = saved.consecutiveZeroCardHands || 0;
       ts.lastErrorResetReason = saved.lastErrorResetReason || null;
       ts.lastErrorResetTime = saved.lastErrorResetTime || null;
+      ts.hasWarnedAhead = saved.hasWarnedAhead || false;
+      ts.lastAlertedMismatchRound = saved.lastAlertedMismatchRound || null;
 
-      ts.deducedBeadRoad = (saved.deducedBeadRoad || []).map(item => {
+      // Support restoring from old format (deducedBeadRoad) or new (handHistory)
+      const rawHistory = saved.handHistory || saved.deducedBeadRoad || [];
+      ts.handHistory = rawHistory.map(item => {
         if (item && typeof item === "object") {
           return {
             ...item,

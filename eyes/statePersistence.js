@@ -12,6 +12,38 @@ const STATE_FILE = path.join(STATE_DIR, "eyes_state.json");
 const DASHBOARD_FILE = path.join(STATE_DIR, "tables_state.json");
 
 /**
+ * Renames a file using a retry loop and fallback strategy to handle Windows locking (EPERM / EBUSY).
+ * If all retries fail, it falls back to a synchronous read/write to overwrite the destination.
+ */
+function safeRenameSync(src, dest, retries = 5, delay = 50) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      fs.renameSync(src, dest);
+      return;
+    } catch (err) {
+      if (err.code === "EPERM" || err.code === "EBUSY") {
+        if (i === retries - 1) {
+          // Last retry failed, perform fallback copy/write operation
+          try {
+            const data = fs.readFileSync(src);
+            fs.writeFileSync(dest, data);
+            fs.unlinkSync(src);
+            return;
+          } catch (fallbackErr) {
+            throw new Error(`safeRenameSync fallback failed: ${fallbackErr.message} (original error: ${err.message})`);
+          }
+        }
+        // Synchronous sleep using high-resolution busy loop
+        const start = Date.now();
+        while (Date.now() - start < delay) {}
+      } else {
+        throw err;
+      }
+    }
+  }
+}
+
+/**
  * Load saved table state from disk.
  * @param {object} stateManager - TableStateManager instance
  * @param {Array} eventLog - In-memory event log reference
@@ -50,14 +82,16 @@ function loadState(stateManager, eventLog, maxAgeMin = 60) {
  */
 function saveState(stateManager, eventLog) {
   try {
+    const tmpFile = STATE_FILE + ".tmp";
     fs.writeFileSync(
-      STATE_FILE,
+      tmpFile,
       JSON.stringify({
         savedAt: new Date().toISOString(),
         tables: stateManager.serialize(),
         eventLog: eventLog,
       })
     );
+    safeRenameSync(tmpFile, STATE_FILE);
   } catch (e) {
     // Silent fail
   }
@@ -65,13 +99,16 @@ function saveState(stateManager, eventLog) {
 
 function mapTableToSnapshot(table, stateManager) {
   const ts = stateManager.getTable(table.tableName);
+  const lastHand = ts ? ts.lastHand : null;
   return {
     tableName: table.tableName,
+    tableId: ts ? ts.tableId : null,
+    roundId: ts ? ts.roundId : null,
     state: table.state,
     timer: table.timer,
     round: table.round,
     wins: table.wins,
-    previousState: ts ? ts.lastState : null,
+    previousState: ts ? ts.state : null,
     handNumber: ts ? ts.handNumber : 0,
     deckRemaining: ts ? ts.remaining : 416,
     deckComposition: ts ? ts.deckComposition : null,
@@ -90,12 +127,11 @@ function mapTableToSnapshot(table, stateManager) {
       Q: ts.deckComposition[11],
       K: ts.deckComposition[12],
     } : null,
-    lastPlayerCards: ts ? ts.lastPlayerCards : [],
-    lastBankerCards: ts ? ts.lastBankerCards : [],
-    bufferedCards: ts ? ts.bufferedCards : { player: [], banker: [] },
+    lastPlayerCards: ts && ts.lastHand ? ts.lastHand.playerCards : [],
+    lastBankerCards: ts && ts.lastHand ? ts.lastHand.bankerCards : [],
     lastErrorResetReason: ts ? ts.lastErrorResetReason : null,
     lastErrorResetTime: ts ? ts.lastErrorResetTime : null,
-    deducedBeadRoad: ts ? ts.deducedBeadRoad : [],
+    deducedBeadRoad: ts ? ts.handHistory : [],
     sourceBeadRoad: table.statistics || [],
     ev: ts && ts.lastEvResult ? {
       player: { ev: ts.lastEvResult.ev_player, evBase: ts.lastEvResult.ev_player_base, prob: ts.lastEvResult.p_player },
@@ -126,8 +162,9 @@ function writeDashboardJson(tables, stateManager, timestamp, events, allScrapedT
   }));
 
   try {
+    const tmpFile = DASHBOARD_FILE + ".tmp";
     fs.writeFileSync(
-      DASHBOARD_FILE,
+      tmpFile,
       JSON.stringify(
         {
           timestamp,
@@ -146,6 +183,7 @@ function writeDashboardJson(tables, stateManager, timestamp, events, allScrapedT
         2
       )
     );
+    safeRenameSync(tmpFile, DASHBOARD_FILE);
   } catch (e) {
     console.error(`[STATE] Failed to write tables_state.json: ${e.message}`);
   }

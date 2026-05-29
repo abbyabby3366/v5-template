@@ -419,12 +419,18 @@
           if (!isNaN(dObj)) tsText = dObj.toLocaleString('sv-SE', { timeZone: 'Asia/Singapore' });
         }
         document.getElementById('ts').textContent=tsText;
-        document.getElementById('tc').textContent=(d.totalTables||0)+' tables';
-        const g=document.getElementById('g');
-        if(d.tables&&d.tables.length){
-          const filtered=edgeOnly?d.tables.filter(hasEdge):d.tables;
-          g.innerHTML=filtered.length?filtered.map(render).join(''):'<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--dim)">No tables with edge</div>';
+        
+        let filtered = d.tables || [];
+        if (currentIgnoredTables && currentIgnoredTables.length) {
+          filtered = filtered.filter(t => !currentIgnoredTables.includes(t.tableName));
         }
+        if (edgeOnly) {
+          filtered = filtered.filter(hasEdge);
+        }
+        
+        document.getElementById('tc').textContent = filtered.length === 1 ? '1 table' : filtered.length + ' tables';
+        const g=document.getElementById('g');
+        g.innerHTML=filtered.length ? filtered.map(render).join('') : `<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--dim)">${edgeOnly ? 'No tables with edge' : 'No active tables'}</div>`;
         document.getElementById('log').innerHTML=renderLog(d.eventLog);
       }catch(e){}
     }

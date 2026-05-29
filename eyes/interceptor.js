@@ -145,6 +145,44 @@
     return null;
   }
 
+  /**
+   * Translates client-side Baccarat state cached from WebSocket / Pinia / Socket.io packets
+   * into a standardized schema expected 100% by the server-side Game Engine (tableManager.js).
+   * 
+   * =========================================================================================
+   * 🚨 CRITICAL INTERFACE CONTRACT (For future modifications):
+   * =========================================================================================
+   * The server-side State Manager (tableManager.js) expects this exact object schema:
+   * 
+   * {
+   *   tableName: string,       // e.g. "PrettyMG05" - Used as the primary key map identifier.
+   *   tableId: string|null,    // e.g. "BAC-005" - Database/API lookup room ID.
+   *   roundId: string|null,    // Unique ID for the current game round (maps from server gameId).
+   *                            // Detects new shoes/rounds when it changes.
+   *   state: string,           // Normalized state: "Waiting for Bets", "Dealing", "Result", "Shuffling".
+   *                            // Result states must include result suffix or be exactly "Result".
+   *   timer: number,           // Remaining seconds for betting, or -1.
+   *   round: number,           // Current round number (1-based index).
+   *   wins: { P: num, B: num, T: num }, // Cumulative round statistics.
+   *   playerCards: string[],   // Normalized array of Player cards (e.g. ["8D", "7H"]).
+   *   bankerCards: string[],   // Normalized array of Banker cards (e.g. ["9S", "QD"]).
+   *   allCards: string[],      // Combined array of all cards.
+   *   winner: "P"|"B"|"T"|null, // Final hand outcome letter.
+   *   statistics: string[]     // Bead road statistics history array.
+   * }
+   * 
+   * =========================================================================================
+   * 🎴 CARD NORMALIZATION RULES:
+   * =========================================================================================
+   * - Cards MUST be represented as "[Rank][Suit]" (e.g. "AH", "9D", "TC", "KS").
+   * - Rank must be single character except for 10 which is normalized to "T" for consistency,
+   *   as tableManager.js parses cards by slicing the last character as the suit: cardName.slice(0, -1).
+   * - Suit must be a single uppercase character (H=Hearts, D=Diamonds, C=Clubs, S=Spades).
+   * - Placeholders/empty cards (e.g. "null", "Red", undefined) MUST be filtered out of the arrays.
+   * 
+   * @param {string} roomId - The raw table room ID (e.g., 'BAC-MG05')
+   * @returns {object|null} Standardized table state object, or null if no entry exists
+   */
   function getParsedTable(roomId) {
     const entry = window.__tableStatesCache[roomId];
     if (!entry) return null;
@@ -152,6 +190,7 @@
     const name = window.__roomToNameMap[roomId] || roomId;
     const stats = entry.statistics || [];
     
+    // Calculate win statistics directly from bead road arrays
     const pWins = stats.filter(c => c.startsWith('p')).length;
     const bWins = stats.filter(c => c.startsWith('b')).length;
     const tWins = stats.filter(c => c.startsWith('t')).length;
@@ -160,6 +199,7 @@
     let state = stateMapping[entry.status] || entry.status || "Waiting for Bets";
     let winner = null;
 
+    // Resolve Winner Letter & Specialized "Result" status sub-types during Payout
     if (entry.status === "PayOut") {
       if (entry.result && entry.result.rsBc) {
         const rs = entry.result.rsBc;
@@ -178,6 +218,8 @@
           }
         }
       }
+      
+      // Fallback to server statistics bead road array if points are not yet populated
       if (!winner && stats.length >= roundNumber) {
         const serverCode = stats[roundNumber - 1];
         winner = mapServerCodeToWinner(serverCode);
@@ -191,8 +233,14 @@
     const bankerCards = [];
     const allCards = [];
 
+    // Extract, Clean, and Normalize card strings
     if (entry.result && entry.result.rsBc) {
       const rs = entry.result.rsBc;
+      
+      /**
+       * Cleans and formats raw card codes into standard [Rank][Suit] notation.
+       * E.g. "10d" -> "Td", "Ad" -> "Ad". Falsy/loading indicators are resolved to null.
+       */
       const normalizeCard = (c) => {
         if (!c || c === "null" || c === "Red") return null;
         if (c.startsWith("10")) return "T" + c.slice(2);
@@ -217,6 +265,8 @@
 
     return {
       tableName: name,
+      tableId: roomId,
+      roundId: entry.gameId || null, // Standardized as roundId for server consumption
       state: state,
       timer: entry.timeLeft !== undefined ? entry.timeLeft : -1,
       round: roundNumber,

@@ -8,8 +8,13 @@
  * Output: { p_player, p_banker, p_tie, ev_player, ev_banker, ev_tie, best }
  */
 
-const { execFileSync } = require("child_process");
+const { execFile } = require("child_process");
+const util = require("util");
 const path = require("path");
+
+const execFilePromise = util.promisify(execFile);
+
+let lastEvErrorNotificationTime = 0;
 
 const ANALYZER_BIN = path.join(
   __dirname,
@@ -28,9 +33,9 @@ const DEFAULT_MIN_EV_THRESHOLD = 0.0003;
  * Calculate EV for a given 13-slot deck composition.
  * @param {number[]} composition - 13-element array [A,2,3,...,K] remaining counts
  * @param {object} config - { rebateRate, minEvThreshold }
- * @returns {object} EV results with probabilities and best bet recommendation
+ * @returns {Promise<object>} EV results with probabilities and best bet recommendation
  */
-function calculateEV(composition, config = {}) {
+async function calculateEV(composition, config = {}) {
   const REBATE_RATE = config.rebateRate !== undefined ? parseFloat(config.rebateRate) : DEFAULT_REBATE_RATE;
   const MIN_EV_THRESHOLD = config.minEvThreshold !== undefined ? parseFloat(config.minEvThreshold) : DEFAULT_MIN_EV_THRESHOLD;
 
@@ -45,12 +50,11 @@ function calculateEV(composition, config = {}) {
 
   try {
     const args = composition.map(String);
-    const stdout = execFileSync(ANALYZER_BIN, args, {
-      encoding: "utf8",
+    const { stdout } = await execFilePromise(ANALYZER_BIN, args, {
       timeout: 5000,
-    }).trim();
+    });
 
-    const probs = JSON.parse(stdout);
+    const probs = JSON.parse(stdout.trim());
     const pp = probs.p_player;
     const pb = probs.p_banker;
     const pt = probs.p_tie;
@@ -96,10 +100,18 @@ function calculateEV(composition, config = {}) {
     };
   } catch (err) {
     console.error(`[EV] Analyzer error: ${err.message}`);
+    const now = Date.now();
+    if (now - lastEvErrorNotificationTime > 15 * 60 * 1000) {
+      lastEvErrorNotificationTime = now;
+      const { sendWhatsAppNotification } = require("../utils/whatsapp_notifier");
+      sendWhatsAppNotification(`[CRITICAL] EV Analyzer failed to execute: ${err.message}`)
+        .catch(wErr => console.error("EV Error Notification failed:", wErr.message));
+    }
     return null;
   }
 }
-function processEVForEvents(events, dynamicConfig = {}) {
+
+async function processEVForEvents(events, dynamicConfig = {}) {
   for (const event of events) {
     if (event.type !== "HAND_COMPLETE" && event.type !== "STATE_CHANGE") continue;
 
@@ -108,7 +120,7 @@ function processEVForEvents(events, dynamicConfig = {}) {
     if (hasReset) continue;
 
     const ts = event.tableState;
-    const evResult = calculateEV(event.deckComposition, dynamicConfig);
+    const evResult = await calculateEV(event.deckComposition, dynamicConfig);
     if (evResult) {
       ts.lastEvResult = evResult;
     }
