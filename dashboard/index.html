@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PG Eyes Dashboard</title>
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:#0b0e14; --card:#12161f; --border:#1a1f2e;
+      --text:#c9d1d9; --dim:#5a6370;
+      --blue:#58a6ff; --green:#3fb950; --red:#f85149;
+      --yellow:#d29922; --cyan:#39c5cf; --purple:#a371f7; --orange:#f97316;
+    }
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{font-family:'JetBrains Mono',monospace;background:var(--bg);color:var(--text);font-size:10px;display:flex;flex-direction:column;height:100vh;overflow:hidden;}
+
+    .bar{background:#0d1117;border-bottom:1px solid var(--border);padding:3px 8px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;}
+    .bar .title{font-size:11px;font-weight:600;color:var(--cyan);}
+    .bar .meta{color:var(--dim);font-size:10px;display:flex;gap:12px;}
+    .bar .live{color:var(--green);}
+
+    .main{display:flex;flex:1;overflow:hidden;}
+
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:2px;padding:3px;flex:1;overflow-y:auto;align-content:start;}
+
+    .log-panel{width:280px;border-left:1px solid var(--border);background:#0d1117;overflow-y:auto;flex-shrink:0;display:flex;flex-direction:column;}
+    .log-title{padding:4px 6px;font-size:10px;font-weight:600;color:var(--yellow);border-bottom:1px solid var(--border);flex-shrink:0;}
+    .log-list{flex:1;overflow-y:auto;padding:2px;}
+    .log-item{padding:3px 5px;border-bottom:1px solid rgba(255,255,255,.03);font-size:9px;line-height:1.4;}
+    .log-item .lt{color:var(--dim);}
+    .log-item .ln{color:var(--cyan);font-weight:500;}
+    .log-item .lw-P{color:var(--blue);}
+    .log-item .lw-B{color:var(--red);}
+    .log-item .lw-T{color:var(--green);}
+    .log-item .le{margin-top:1px;}
+    .log-item .le .pos{color:var(--green);}
+    .log-item .le .neg{color:var(--red);}
+    .log-item .edge-alert{color:var(--yellow);font-weight:600;}
+
+    .tc{background:var(--card);border:1px solid var(--border);border-radius:3px;padding:3px 5px;cursor:default;transition:border-color .15s;}
+    .tc:hover{border-color:#2a3040;}
+    .tc.edge{border-color:var(--yellow);}
+
+    .tc .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:1px;}
+    .tc .name{font-weight:600;font-size:10px;color:var(--cyan);}
+    .tc .st{font-size:7px;padding:1px 3px;border-radius:2px;font-weight:500;text-transform:uppercase;}
+    .st-w{background:rgba(88,166,255,.12);color:var(--blue);}
+    .st-d{background:rgba(210,153,34,.12);color:var(--yellow);}
+    .st-r{background:rgba(63,185,80,.12);color:var(--green);}
+
+    .tc .info{display:flex;gap:5px;color:var(--dim);font-size:9px;margin-bottom:1px;}
+    .tc .wins{font-size:9px;margin-bottom:1px;}
+    .tc .p{color:var(--blue);}
+    .tc .b{color:var(--red);}
+    .tc .t{color:var(--green);}
+
+    .tc .dk{display:flex;gap:1px;margin-bottom:1px;}
+    .tc .dk .s{flex:1;text-align:center;}
+    .tc .dk .s .r{font-size:7px;color:var(--dim);line-height:1;}
+    .tc .dk .s .c{font-size:9px;line-height:1.2;}
+    .tc .dk .s .c.lo{color:var(--orange);}
+    .tc .dk .s .c.out{color:var(--red);}
+
+    .tc .ev{font-size:9px;display:flex;gap:5px;}
+    .tc .ev .pos{color:var(--green);}
+    .tc .ev .neg{color:var(--red);}
+    .tc .ev .dim{color:var(--dim);}
+
+    .tc .alert{margin-top:1px;padding:1px 3px;font-size:8px;font-weight:600;background:rgba(210,153,34,.1);border:1px solid rgba(210,153,34,.2);border-radius:2px;color:var(--yellow);}
+
+    .tc .cards{font-size:8px;color:var(--dim);margin-bottom:1px;}
+    .pbar{height:2px;background:rgba(255,255,255,.04);border-radius:1px;margin-bottom:1px;overflow:hidden;}
+    .pbar .f{height:100%;border-radius:1px;}
+    .rst{background:none;border:1px solid var(--border);color:var(--dim);font-size:8px;padding:1px 3px;border-radius:2px;cursor:pointer;font-family:inherit;margin-left:3px;}
+    .rst:hover{border-color:var(--red);color:var(--red);}
+    .tog{background:none;border:1px solid var(--border);color:var(--dim);font-size:9px;padding:1px 5px;border-radius:2px;cursor:pointer;font-family:inherit;}
+    .tog:hover{border-color:var(--cyan);color:var(--cyan);}
+    .tog.on{border-color:var(--cyan);color:var(--cyan);}
+    body.hide-deck .dk{display:none!important;}
+    body.hide-deck .dk-roads{display:none!important;}
+    .tc .bead-roads { margin-top: 3px; border-top: 1px dashed var(--border); padding-top: 3px; font-size: 8px; display: flex; flex-direction: column; gap: 2px; }
+    .tc .bead-road-row { display: flex; align-items: flex-start; gap: 4px; }
+    .tc .bead-road-label { color: var(--dim); width: 45px; flex-shrink: 0; margin-top: 2px; }
+    .tc .bead-road-list { display: flex; flex-wrap: wrap; gap: 2px; flex: 1; padding-bottom: 2px; }
+    .bead-col { display: flex; flex-direction: column; align-items: center; gap: 2px; flex-shrink: 0; }
+    .bead-num { font-size: 6px; color: var(--dim); line-height: 1; }
+    .tc .bead { width: 10px; height: 10px; border-radius: 50%; display: inline-block; text-align: center; line-height: 10px; font-size: 7px; font-weight: bold; color: #fff; flex-shrink: 0; }
+    .bead.P { background: var(--blue); }
+    .bead.B { background: var(--red); }
+    .bead.T { background: var(--green); }
+    .bead-road-list::-webkit-scrollbar { height: 2px; }
+    .bead-road-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 1px; }
+
+    /* Modal Styles */
+    .modal-overlay { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.8); align-items:center; justify-content:center; z-index:100; }
+    .modal { background:var(--card); border:1px solid var(--border); border-radius:5px; padding:15px; width:400px; max-width:90%; display:flex; flex-direction:column; max-height:80vh; }
+    .modal-title { font-size:14px; font-weight:600; color:var(--cyan); margin-bottom:10px; }
+    .modal-body { flex:1; overflow-y:auto; margin-bottom:10px; }
+    .modal-footer { display:flex; justify-content:flex-end; gap:10px; }
+    .btn { background:var(--bg); border:1px solid var(--border); color:var(--text); padding:5px 10px; border-radius:3px; cursor:pointer; font-family:inherit; }
+    .btn.primary { background:var(--cyan); color:#000; border-color:var(--cyan); font-weight:600; }
+    .btn:hover { opacity:0.8; }
+    .table-check-item { display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.05); }
+    .table-check-item label { cursor:pointer; user-select:none; font-size:11px; flex:1; }
+    .table-check-item input[type="checkbox"] { cursor:pointer; width:14px; height:14px; }
+  </style>
+</head>
+<body>
+  <div class="bar">
+    <span class="title">PG Eyes</span>
+    <div class="meta">
+      <a href="/bets" style="color:var(--cyan);text-decoration:none;border:1px solid var(--border);padding:1px 5px;border-radius:2px;font-size:9px;">Bets Log</a>
+      <button class="rst" onclick="resetAllTables()">Reset All</button>
+      <button class="tog" onclick="openTablesConfig()">Tables Config</button>
+      <button class="tog" onclick="openEvConfig()">EV Config</button>
+      <button class="tog" onclick="openShufflesStats()">Shuffles Stats</button>
+      <button class="tog" id="deckToggle" onclick="toggleDeck()">Deck</button>
+      <button class="tog" id="edgeToggle" onclick="toggleEdge()">Edge Only</button>
+      <span class="live">● LIVE</span>
+      <span id="ts">—</span>
+      <span id="tc" style="color: white; font-weight: 600;">0</span>
+    </div>
+  </div>
+  <div class="main">
+    <div class="grid" id="g"></div>
+    <div class="log-panel">
+      <div class="log-title">Event Log (last 100)</div>
+      <div class="log-list" id="log"></div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="tablesModal">
+    <div class="modal">
+      <div class="modal-title">Tables Detection Config</div>
+      <div style="margin-bottom:8px; font-size:10px; color:var(--dim);">Uncheck a table to stop detecting, displaying, and betting on it. Check "Select All" to re-enable all.</div>
+      <div class="table-check-item" style="border-bottom: 2px solid var(--border); margin-bottom: 5px;">
+        <input type="checkbox" id="chk_selectAll" onclick="toggleAllTables(this)">
+        <label for="chk_selectAll" style="font-weight: bold; color: var(--yellow);">Select All</label>
+      </div>
+      <div class="modal-body" id="tablesCheckList">
+      </div>
+      <div class="modal-footer">
+        <button class="btn" onclick="closeTablesConfig()">Cancel</button>
+        <button class="btn primary" onclick="saveTablesConfig()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="evModal">
+    <div class="modal" style="width: 300px;">
+      <div class="modal-title">EV Config</div>
+      <div class="modal-body" style="display:flex; flex-direction:column; gap:10px;">
+        <div>
+          <label style="font-size:10px; color:var(--dim); display:block; margin-bottom:4px;">Min EV Threshold</label>
+          <input type="number" id="inp_minEv" step="0.0001" style="width:100%; padding:5px; background:var(--bg); border:1px solid var(--border); color:var(--text); border-radius:3px;">
+        </div>
+        <div>
+          <label style="font-size:10px; color:var(--dim); display:block; margin-bottom:4px;">Rebate Rate</label>
+          <input type="number" id="inp_rebate" step="0.001" style="width:100%; padding:5px; background:var(--bg); border:1px solid var(--border); color:var(--text); border-radius:3px;">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" onclick="closeEvConfig()">Cancel</button>
+        <button class="btn primary" onclick="saveEvConfig()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="shufflesModal">
+    <div class="modal" style="width: 500px;">
+      <div class="modal-title">Table Shuffles Detected</div>
+      <div class="modal-body" id="shufflesStatsBody">
+        <div style="color:var(--dim); padding:10px;">Loading stats...</div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" onclick="closeShufflesStats()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const R=['A','2','3','4','5','6','7','8','9','T','J','Q','K'];
+    let MIN_EV=0.0015; // updated from server config each tick
+    let showDeck=localStorage.getItem('showDeck')==='true';
+    let edgeOnly=localStorage.getItem('edgeOnly')==='true';
+    document.body.classList.toggle('hide-deck',!showDeck);
+    // Elements are already in DOM so we can toggle their classes immediately
+    document.getElementById('deckToggle').classList.toggle('on',showDeck);
+    document.getElementById('edgeToggle').classList.toggle('on',edgeOnly);
+
+    function toggleDeck(){
+      showDeck=!showDeck;
+      localStorage.setItem('showDeck',showDeck);
+      document.body.classList.toggle('hide-deck',!showDeck);
+      document.getElementById('deckToggle').classList.toggle('on',showDeck);
+    }
+    function toggleEdge(){
+      edgeOnly=!edgeOnly;
+      localStorage.setItem('edgeOnly',edgeOnly);
+      document.getElementById('edgeToggle').classList.toggle('on',edgeOnly);
+      poll();
+    }
+    function hasEdge(t){
+      if(!t.ev)return false;
+      return t.ev.player.ev>=MIN_EV||t.ev.banker.ev>=MIN_EV;
+    }
+
+    function stCls(s){
+      if(!s)return'st-w';
+      if(s.startsWith('Result'))return'st-r';
+      if(s==='Dealing'||s==='Dealing / No More Bets')return'st-d';
+      return'st-w';
+    }
+
+    function ev(v){
+      if(v==null)return'—';
+      const p=(v*100).toFixed(4);
+      return v>=0?'+'+p+'%':p+'%';
+    }
+    function evCls(v){return v>=MIN_EV?'pos':'dim';}
+
+    function render(t){
+      const e=t.ev&&t.ev.best;
+      const pct=Math.min(100,(t.deckRemaining/416)*100);
+      const col=pct>60?'var(--green)':pct>30?'var(--yellow)':'var(--red)';
+      const comp=t.deckComposition||[];
+
+      let dk='';
+      if(comp.length===13){
+        dk='<div class="dk">'+R.map((r,i)=>{
+          const c=comp[i];
+          const cls=c<=8?'out':c<=16?'lo':'';
+          return`<div class="s"><div class="r">${r}</div><div class="c ${cls}">${c}</div></div>`;
+        }).join('')+'</div>';
+      }
+
+      let roadsHtml = '';
+      if (t.deducedBeadRoad || t.sourceBeadRoad) {
+        const mapSourceWinner = (code) => {
+          if (!code) return '';
+          if (code.startsWith('p')) return 'P';
+          if (code.startsWith('b')) return 'B';
+          if (code.startsWith('t')) return 'T';
+          return '';
+        };
+
+        const isShuffling = t.state && t.state.toLowerCase().includes('shuff');
+        const totalRounds = isShuffling ? 0 : (t.sourceBeadRoad ? t.sourceBeadRoad.length : 0);
+        const deducedMap = {};
+        
+        if (!isShuffling) {
+          (t.deducedBeadRoad || []).forEach(item => {
+            if (item && typeof item === 'object') {
+              deducedMap[item.round] = item.winner;
+            }
+          });
+
+          // Backward compatibility fallback for legacy string array states
+          const legacyStringList = (t.deducedBeadRoad || []).filter(item => typeof item === 'string');
+          if (legacyStringList.length > 0) {
+            const totalDeduced = t.deducedBeadRoad.length;
+            const isResult = t.state && t.state.startsWith('Result');
+            const lastCompletedRound = isResult ? t.round : t.round - 1;
+            t.deducedBeadRoad.forEach((item, idx) => {
+              if (typeof item === 'string') {
+                const rNum = lastCompletedRound - (totalDeduced - 1 - idx);
+                deducedMap[rNum] = item;
+              }
+            });
+          }
+        }
+
+        const deducedList = [];
+        for (let rNum = 1; rNum <= totalRounds; rNum++) {
+          const item = (t.deducedBeadRoad || []).find(x => x && (x.round === rNum || (typeof x === 'object' && x.round === rNum)));
+          const w = item ? (typeof item === 'object' ? item.winner : item) : deducedMap[rNum];
+          
+          if (w) {
+            let titleText = `Round ${rNum}`;
+            if (item && typeof item === 'object') {
+              if (item.playerCards && item.playerCards.length) {
+                titleText += `\nPlayer: [${item.playerCards.join(', ')}]`;
+              }
+              if (item.bankerCards && item.bankerCards.length) {
+                titleText += `\nBanker: [${item.bankerCards.join(', ')}]`;
+              }
+            }
+            deducedList.push(`<div class="bead-col"><span class="bead-num">${rNum}</span><span class="bead ${w}" title="${titleText}">${w}</span></div>`);
+          } else {
+            deducedList.push(`<div class="bead-col"><span class="bead-num">${rNum}</span><span class="bead" style="background:transparent; visibility:hidden;"></span></div>`);
+          }
+        }
+
+        const sourceList = isShuffling ? '' : (t.sourceBeadRoad || []).map((code, index) => {
+          const w = mapSourceWinner(code);
+          const roundNum = index + 1;
+          return w ? `<div class="bead-col"><span class="bead-num">${roundNum}</span><span class="bead ${w}">${w}</span></div>` : '';
+        }).join('');
+
+        roadsHtml = `<div class="dk-roads bead-roads">
+          <div class="bead-road-row">
+            <span class="bead-road-label">Deduced:</span>
+            <div class="bead-road-list">${deducedList.join('') || '<span style="color:var(--dim)">—</span>'}</div>
+          </div>
+          <div class="bead-road-row">
+            <span class="bead-road-label">Source:</span>
+            <div class="bead-road-list">${sourceList || '<span style="color:var(--dim)">—</span>'}</div>
+          </div>
+        </div>`;
+      }
+
+      let evH='';
+      if(t.ev){
+        const pa=t.ev.player.ev,ba=t.ev.banker.ev;
+        evH=`<div class="ev"><span class="dim">EV</span>
+          <span>P:<span class="${evCls(pa)}">${ev(pa)}</span></span>
+          <span>B:<span class="${evCls(ba)}">${ev(ba)}</span></span>
+          <span class="dim">T:${(t.ev.tie.prob*100).toFixed(4)}%</span>
+        </div>`;
+        if(e)evH+=`<div class="alert">🤑 ${e.target} ${ev(e.ev)}</div>`;
+      }
+
+      const lc=(t.lastPlayerCards?.length||t.lastBankerCards?.length)
+        ?`<div class="cards">P[${(t.lastPlayerCards||[]).join(',')}] B[${(t.lastBankerCards||[]).join(',')}]</div>`:'';
+
+      let errorHtml = '';
+      if (t.lastErrorResetReason) {
+        let errTime = '';
+        if (t.lastErrorResetTime) {
+          const d = new Date(t.lastErrorResetTime);
+          errTime = d.toLocaleTimeString('en-GB', { timeZone: 'Asia/Singapore', hour12: false }) + ' ';
+        }
+        errorHtml = `<div class="alert" style="color:var(--red); border-color:var(--red); background:rgba(248,81,73,.1); white-space:normal; line-height:1.2;">⚠ Reset: ${errTime}${t.lastErrorResetReason}</div>`;
+      }
+
+      return`<div class="tc${e?' edge':''}">
+        <div class="top"><span class="name">${t.tableName}</span><span class="st ${stCls(t.state)}">${t.state||'—'}</span></div>
+        <div class="pbar"><div class="f" style="width:${pct}%;background:${col}"></div></div>
+        <div class="info"><span style="color:var(--text)">H${t.handNumber}</span><span style="color:var(--text)">R${t.round}</span><span class="p">P${t.wins?.P??0}</span><span class="b">B${t.wins?.B??0}</span><span class="t">T${t.wins?.T??0}</span><span style="margin-left:auto">${t.deckRemaining}/416</span></div>
+        ${lc}${dk}${roadsHtml}${evH}${errorHtml}
+      </div>`;
+    }
+
+    function renderLog(events){
+      if(!events||!events.length)return'<div class="log-item" style="color:var(--dim)">No events yet</div>';
+      return events.map(e=>{
+        const wCls=e.winner?`lw-${e.winner}`:'';
+        const wLabel=e.winner==='P'?'Player':e.winner==='B'?'Banker':e.winner==='T'?'Tie':'—';
+        const cards=e.playerCards?.length?`P[${e.playerCards.join(',')}] B[${e.bankerCards.join(',')}]`:'';
+
+        let evLine='';
+        if(e.ev){
+          const pe=e.ev.player,be=e.ev.banker;
+          evLine=`<div class="le">P:<span class="${pe>=0?'pos':'neg'}">${ev(pe)}</span> B:<span class="${be>=0?'pos':'neg'}">${ev(be)}</span></div>`;
+          if(e.ev.best)evLine+=`<div class="edge-alert">🤑 ${e.ev.best.target} ${ev(e.ev.best.ev)}</div>`;
+        }
+
+        let logTime = '';
+        if (e.time && e.time.includes('T')) {
+          const parts = e.time.split('T');
+          const dObj = new Date(parts[0] + 'T' + parts[1].replace(/-/g, ':') + 'Z');
+          if (!isNaN(dObj)) {
+            logTime = dObj.toLocaleTimeString('en-GB', { timeZone: 'Asia/Singapore', hour12: false });
+          } else {
+            logTime = parts[1].replace('Z','').slice(0,8);
+          }
+        }
+
+        return`<div class="log-item">
+          <span class="lt">${logTime}</span> <span class="ln">${e.table}</span> R${e.round}
+          <span class="${wCls}">${wLabel}</span> ${cards} [${e.deckRemaining}]
+          ${evLine}
+        </div>`;
+      }).join('');
+    }
+
+    let lastPollSuccess = Date.now();
+    setInterval(() => {
+      const liveSpan = document.querySelector('.live');
+      if (liveSpan) {
+        if (Date.now() - lastPollSuccess > 5000) {
+          liveSpan.style.color = 'var(--red)';
+          liveSpan.textContent = '● OFFLINE';
+        } else {
+          liveSpan.style.color = 'var(--green)';
+          liveSpan.textContent = '● LIVE';
+        }
+      }
+    }, 1000);
+
+    let lastTimestampStr = '';
+    let currentAllTables = [];
+    let currentIgnoredTables = [];
+
+    async function poll(){
+      try{
+        const r=await fetch('/tables_state.json?'+Date.now());
+        if(!r.ok)return;
+        const d=await r.json();
+        
+        if (d.timestamp !== lastTimestampStr) {
+          lastTimestampStr = d.timestamp;
+          lastPollSuccess = Date.now();
+        }
+
+        if (d.allScrapedTables) currentAllTables = d.allScrapedTables;
+        if (d.ignoredTables) currentIgnoredTables = d.ignoredTables;
+
+        if(d.config){
+          MIN_EV=d.config.minEvThreshold||0.0015;
+          window.currentConfig = d.config;
+        }
+        let tsText = d.timestamp || '—';
+        if (d.timestamp && d.timestamp.includes('T')) {
+          const parts = d.timestamp.split('T');
+          const dObj = new Date(parts[0] + 'T' + parts[1].replace(/-/g, ':') + 'Z');
+          if (!isNaN(dObj)) tsText = dObj.toLocaleString('sv-SE', { timeZone: 'Asia/Singapore' });
+        }
+        document.getElementById('ts').textContent=tsText;
+        document.getElementById('tc').textContent=(d.totalTables||0)+' tables';
+        const g=document.getElementById('g');
+        if(d.tables&&d.tables.length){
+          const filtered=edgeOnly?d.tables.filter(hasEdge):d.tables;
+          g.innerHTML=filtered.length?filtered.map(render).join(''):'<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--dim)">No tables with edge</div>';
+        }
+        document.getElementById('log').innerHTML=renderLog(d.eventLog);
+      }catch(e){}
+    }
+    poll();setInterval(poll,1000);
+
+    async function resetTable(name){
+      if(!confirm(`Reset deck for ${name} to fresh shoe?`))return;
+      try{
+        const r=await fetch('/reset?table='+encodeURIComponent(name),{method:'POST'});
+        const d=await r.json();
+        if(d.ok)poll();
+      }catch(e){}
+    }
+
+    async function resetAllTables() {
+      const p = prompt('Type "reset" to confirm resetting ALL tables to fresh shoes:');
+      if (p !== 'reset') return;
+      try {
+        const r = await fetch('/reset-all', { method: 'POST' });
+        const d = await r.json();
+        if (d.ok) poll();
+      } catch (e) {}
+    }
+
+    function openTablesConfig() {
+      const container = document.getElementById('tablesCheckList');
+      if (!currentAllTables.length) {
+        container.innerHTML = '<div style="color:var(--dim); padding:10px;">No tables detected yet. Please wait...</div>';
+      } else {
+        const sorted = [...currentAllTables].sort((a,b) => a.localeCompare(b));
+        let allChecked = true;
+        container.innerHTML = sorted.map(t => {
+          const isChecked = !currentIgnoredTables.includes(t);
+          if (!isChecked) allChecked = false;
+          return `<div class="table-check-item">
+            <input type="checkbox" id="chk_${t}" class="table-chk" value="${t}" ${isChecked ? 'checked' : ''} onchange="updateSelectAllState()">
+            <label for="chk_${t}">${t}</label>
+          </div>`;
+        }).join('');
+        document.getElementById('chk_selectAll').checked = allChecked;
+      }
+      document.getElementById('tablesModal').style.display = 'flex';
+    }
+
+    function closeTablesConfig() {
+      document.getElementById('tablesModal').style.display = 'none';
+    }
+
+    function toggleAllTables(chkBox) {
+      const isChecked = chkBox.checked;
+      const checkboxes = document.querySelectorAll('#tablesCheckList .table-chk');
+      checkboxes.forEach(cb => cb.checked = isChecked);
+    }
+
+    function updateSelectAllState() {
+      const checkboxes = document.querySelectorAll('#tablesCheckList .table-chk');
+      let allChecked = true;
+      checkboxes.forEach(cb => { if (!cb.checked) allChecked = false; });
+      document.getElementById('chk_selectAll').checked = allChecked;
+    }
+
+    async function saveTablesConfig() {
+      const checkboxes = document.querySelectorAll('#tablesCheckList .table-chk');
+      const newIgnored = [];
+      checkboxes.forEach(cb => {
+        if (!cb.checked) newIgnored.push(cb.value);
+      });
+      
+      try {
+        const res = await fetch('/api/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ignoredTables: newIgnored })
+        });
+        if (res.ok) {
+          closeTablesConfig();
+          // Reset local variable to avoid delay in UI update
+          currentIgnoredTables = newIgnored;
+          poll();
+        }
+      } catch (e) {
+        alert("Failed to save config.");
+      }
+    }
+
+    function openEvConfig() {
+      const cfg = window.currentConfig || { minEvThreshold: 0.0015, rebateRate: 0.012 };
+      document.getElementById('inp_minEv').value = cfg.minEvThreshold;
+      document.getElementById('inp_rebate').value = cfg.rebateRate;
+      document.getElementById('evModal').style.display = 'flex';
+    }
+
+    function closeEvConfig() {
+      document.getElementById('evModal').style.display = 'none';
+    }
+
+    async function saveEvConfig() {
+      const minEv = parseFloat(document.getElementById('inp_minEv').value);
+      const rebate = parseFloat(document.getElementById('inp_rebate').value);
+      
+      try {
+        const res = await fetch('/api/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ minEvThreshold: minEv, rebateRate: rebate })
+        });
+        if (res.ok) {
+          closeEvConfig();
+          poll();
+        }
+      } catch (e) {
+        alert("Failed to save config.");
+      }
+    }
+
+    async function openShufflesStats() {
+      document.getElementById('shufflesModal').style.display = 'flex';
+      const container = document.getElementById('shufflesStatsBody');
+      container.innerHTML = '<div style="color:var(--dim); padding:10px;">Loading stats...</div>';
+      
+      try {
+        const res = await fetch('/api/shuffles');
+        const data = await res.json();
+        if (data.ok && data.stats) {
+          if (data.stats.length === 0) {
+            container.innerHTML = '<div style="color:var(--dim); padding:10px;">No shuffles recorded yet.</div>';
+            return;
+          }
+          
+          let html = '';
+          for (const s of data.stats) {
+            const arrStr = s.finalRounds && s.finalRounds.length > 0 ? `[${s.finalRounds.join(', ')}]` : '[]';
+            html += `
+              <div style="margin-bottom: 15px; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
+                <div id="stats-date-info" style="color:var(--yellow); font-size:11px; margin-bottom:5px; font-weight:600;">
+                  ${s.label}
+                </div>
+                <div style="font-size: 14px; font-weight: bold; color: var(--cyan);">
+                  ${s.count} <span style="font-size: 10px; color: var(--dim); font-weight: normal;">shuffles</span>
+                </div>
+                <div style="font-size: 10px; color: var(--dim); margin-top: 5px;">
+                  Final Rounds: <span style="color: var(--text); user-select: all; font-family: monospace;">${arrStr}</span>
+                </div>
+              </div>
+            `;
+          }
+          container.innerHTML = html;
+        } else {
+          container.innerHTML = '<div style="color:var(--red); padding:10px;">Error loading stats.</div>';
+        }
+      } catch (e) {
+        container.innerHTML = '<div style="color:var(--red); padding:10px;">Error loading stats.</div>';
+      }
+    }
+
+    function closeShufflesStats() {
+      document.getElementById('shufflesModal').style.display = 'none';
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PG Eyes - Bets Dashboard</title>
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:#0b0e14; --card:#12161f; --border:#1a1f2e;
+      --text:#c9d1d9; --dim:#5a6370;
+      --blue:#58a6ff; --green:#3fb950; --red:#f85149;
+      --yellow:#d29922; --cyan:#39c5cf; --purple:#a371f7; --orange:#f97316;
+    }
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{font-family:'JetBrains Mono',monospace;background:var(--bg);color:var(--text);font-size:11px;display:flex;flex-direction:column;height:100vh;overflow:hidden;}
+
+    .bar{background:#0d1117;border-bottom:1px solid var(--border);padding:8px 12px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;}
+    .bar .title{font-size:14px;font-weight:600;color:var(--purple);}
+    .bar .meta{color:var(--dim);font-size:11px;display:flex;gap:12px;align-items:center;}
+    .bar a{color:var(--cyan);text-decoration:none;border:1px solid var(--border);padding:3px 8px;border-radius:3px;transition:0.2s;}
+    .bar a:hover{border-color:var(--cyan);background:rgba(57,197,207,0.1);}
+
+    .main{flex:1;overflow-y:auto;padding:10px;}
+    
+    table {width:100%;border-collapse:collapse;}
+    th, td {padding:8px 10px;text-align:left;border-bottom:1px solid var(--border);}
+    th {position:sticky;top:0;background:#0d1117;color:var(--dim);font-weight:600;font-size:10px;text-transform:uppercase;z-index:2;}
+    
+    tr:hover:not(.reason-row) {background:var(--card);}
+    
+    .status-PENDING {color:var(--yellow);}
+    .status-SUCCESS {color:var(--green);}
+    .status-FAILED {color:var(--red);}
+    .status-UNPLACED {color:var(--dim);}
+    .status-WRONG_AMOUNT {color:var(--orange);}
+    .status-EXPIRED {color:var(--dim);font-style:italic;}
+    .status-DISPATCH_FAILED {color:var(--orange);}
+    
+    .target-PlayerBet, .target-Player {color:var(--blue);}
+    .target-BankerBet, .target-Banker {color:var(--red);}
+    .target-TieBet, .target-Tie {color:var(--green);}
+
+    .btn-reason {background:none;border:1px solid var(--border);color:var(--cyan);font-family:inherit;font-size:10px;padding:2px 6px;cursor:pointer;border-radius:2px;}
+    .btn-reason:hover {background:var(--card);border-color:var(--cyan);}
+    
+    .reason-row {display:none;background:#0d1117;}
+    .reason-row.active {display:table-row;}
+    .reason-content {padding:10px;font-size:10px;color:var(--dim);white-space:pre-wrap;word-break:break-all;max-height:300px;overflow-y:auto;border:1px solid rgba(255,255,255,0.05);border-radius:4px;background:#0a0c10;}
+    .reason-truncate {font-size:10px;color:var(--dim);margin-top:4px;cursor:pointer;white-space:normal;overflow:visible;text-overflow:unset;max-width:none;transition:all 0.2s;}
+    .reason-truncate:hover {color:var(--cyan);}
+    .reason-truncate.expanded {white-space:normal;overflow:visible;text-overflow:unset;max-width:none;}
+
+    @media (max-width: 768px) {
+      .reason-truncate {white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;}
+      .col-details, .col-table {display:none;}
+    }
+
+    .modules-panel { padding: 12px; background: #0d1117; border-bottom: 1px solid var(--border); display: flex; gap: 12px; flex-wrap: wrap; }
+    .module-card { background: var(--card); border: 1px solid var(--border); padding: 8px 12px; border-radius: 6px; min-width: 200px; }
+    .module-card .m-title { font-size: 12px; font-weight: 600; color: var(--cyan); margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; }
+    .module-card .m-url { color: var(--dim); font-size: 10px; margin-bottom: 8px; }
+    .acct-row { display: flex; justify-content: space-between; font-size: 10px; margin-top: 4px; padding-top: 4px; border-top: 1px solid rgba(255,255,255,0.05); }
+    .status-dot { height: 8px; width: 8px; border-radius: 50%; display: inline-block; }
+    .status-online { background: var(--green); box-shadow: 0 0 5px var(--green); }
+    .status-offline { background: var(--red); }
+
+    .modal-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.8); display:none; justify-content:center; align-items:center; z-index:99; }
+    .modal { background:var(--card); border:1px solid var(--border); padding:20px; border-radius:8px; width:400px; }
+    .modal h2 { margin-bottom:15px; color:var(--cyan); font-size:16px; }
+    .form-group { margin-bottom:12px; }
+    .form-group label { display:block; font-size:11px; color:var(--dim); margin-bottom:4px; }
+    .form-group input { width:100%; background:#0d1117; border:1px solid var(--border); color:var(--text); padding:6px; font-family:inherit; border-radius:4px; }
+    .modal-actions { display:flex; justify-content:flex-end; gap:10px; margin-top:20px; }
+    .btn { padding:6px 12px; border:none; border-radius:4px; cursor:pointer; font-family:inherit; font-weight:600; }
+    .btn-primary { background:var(--cyan); color:#000; }
+    .btn-secondary { background:#0d1117; color:var(--text); border:1px solid var(--border); }
+  </style>
+</head>
+<body>
+  <div class="bar">
+    <span class="title">PG Bet Module</span>
+    <div class="meta">
+      <span id="ts">Loading...</span>
+      <span id="count" style="color:white;font-weight:600;">0 bets</span>
+      <label style="display:flex;align-items:center;gap:4px;cursor:pointer;margin-left:10px;">
+        <input type="checkbox" id="cfg-autobet-outside" onchange="toggleAutoBet()" />
+        <span style="font-weight:600;color:var(--yellow);">Auto Bet</span>
+      </label>
+      <button onclick="openSettings()" style="background:var(--cyan);color:#000;border:none;padding:3px 8px;border-radius:3px;cursor:pointer;font-family:inherit;font-weight:600;margin-left:5px;">Bet Settings</button>
+      <button onclick="window.location.href='/stats'" style="background:var(--blue);color:white;border:none;padding:3px 8px;border-radius:3px;cursor:pointer;font-family:inherit;font-weight:600;margin-left:5px;">View Stats</button>
+      <a href="/">← Back to Tables</a>
+    </div>
+  </div>
+  <div class="modules-panel" id="modules-panel">
+    <div style="color:var(--dim);">Loading modules...</div>
+  </div>
+  <div id="success-rates-panel" style="background:#0a0c10; border-bottom:1px solid var(--border); padding:8px 12px; display:flex; gap:15px; flex-wrap:wrap; font-size:11px; align-items:center;">
+    <div style="color:var(--dim);">Loading success rates...</div>
+  </div>
+  <div class="main">
+    <div style="display:flex; justify-content:flex-end; gap:8px; margin-bottom:10px; align-items:center;">
+      <button id="btn-open-filter" onclick="openFilterModal()" style="background:#0d1117;border:1px solid var(--border);color:var(--text);padding:3px 8px;border-radius:3px;cursor:pointer;font-family:inherit;font-size:11px;position:relative;">
+        ⚙ Filters
+        <span id="filter-badge" style="display:none;position:absolute;top:-6px;right:-6px;background:var(--cyan);color:#000;font-size:9px;font-weight:bold;border-radius:50%;width:14px;height:14px;line-height:14px;text-align:center;">0</span>
+      </button>
+      <span id="page-info" style="color:var(--cyan);font-weight:600;margin:0 10px;">Page 1 of 1</span>
+      <button onclick="prevPage()" style="background:#0d1117;border:1px solid var(--border);color:var(--text);padding:3px 8px;border-radius:3px;cursor:pointer;font-family:inherit;font-size:11px;">Prev</button>
+      <button onclick="nextPage()" style="background:#0d1117;border:1px solid var(--border);color:var(--text);padding:3px 8px;border-radius:3px;cursor:pointer;font-family:inherit;font-size:11px;">Next</button>
+      <button onclick="refreshSuccessRates()" id="btn-refresh-sr" style="background:var(--purple);color:white;border:none;padding:3px 8px;border-radius:3px;cursor:pointer;font-family:inherit;font-weight:600;">Refresh Success Rates</button>
+      <button onclick="clearLogs()" style="background:var(--red);color:white;border:none;padding:3px 8px;border-radius:3px;cursor:pointer;font-family:inherit;font-weight:600;">Clear Logs</button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th style="width:120px">Time</th>
+          <th class="col-table">Table (Round)</th>
+          <th>1. Signal (From Eyes)</th>
+          <th>2. Betting Execution</th>
+          <th>3. Round Outcome</th>
+          <th class="col-details" style="width:80px;text-align:right;">Details</th>
+        </tr>
+      </thead>
+      <tbody id="tb">
+        <tr><td colspan="8" style="text-align:center;color:var(--dim);">Loading bets...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    let openedReasons = new Set();
+    let currentMinBalance = 0;
+    
+    function fmtEv(v){
+      if(v==null)return'—';
+      const p=(v*100).toFixed(4);
+      return v>=0?'+'+p+'%':p+'%';
+    }
+
+    function toggleReason(id) {
+      if(openedReasons.has(id)) openedReasons.delete(id);
+      else openedReasons.add(id);
+      
+      const el = document.getElementById('reason-' + id);
+      if(el) {
+        el.classList.toggle('active');
+      }
+    }
+
+    async function clearLogs() {
+      if (!confirm("Are you sure you want to delete all bet logs? This will also clear the MongoDB database.")) return;
+      try {
+        await fetch('/clear-bet-logs', { method: 'POST' });
+        lastDataStr = ''; // force re-render
+        document.getElementById('tb').innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--dim);padding:20px;">Clearing logs...</td></tr>';
+        poll();
+      } catch(e) {
+        alert("Failed to clear logs: " + e.message);
+      }
+    }
+
+    async function refreshSuccessRates() {
+      const btn = document.getElementById('btn-refresh-sr');
+      const originalText = btn.textContent;
+      btn.textContent = "Refreshing...";
+      btn.disabled = true;
+      try {
+        await fetch('/api/refresh-success-rate', { method: 'POST' });
+        lastDataStr = ''; // force re-render
+        poll();
+      } catch(e) {
+        alert("Failed to refresh success rates: " + e.message);
+      } finally {
+        btn.textContent = originalText;
+        btn.disabled = false;
+      }
+    }
+
+    function renderBet(b) {
+      const d = new Date(b.time);
+      const dateStr = d.toLocaleDateString('en-GB', { timeZone: 'Asia/Singapore', day: '2-digit', month: 'short' });
+      const timeStr = d.toLocaleTimeString('en-GB', { timeZone: 'Asia/Singapore', hour12: false }) + '.' + String(d.getMilliseconds()).padStart(3,'0');
+      
+      const targetCls = 'target-' + b.target;
+      const statusCls = 'status-' + b.outcome;
+      const isActive = openedReasons.has(b.id) ? 'active' : '';
+
+      let profitHtml = '';
+      const amt = parseFloat(b.actualBetAmount);
+      if ((b.outcome === 'SUCCESS' || b.outcome === 'WRONG_AMOUNT') && !isNaN(amt) && ['B', 'P', 'T'].includes(b.roundOutcome)) {
+        let profit = 0;
+        let targetSide = '';
+        if (b.target.includes('Banker')) targetSide = 'B';
+        else if (b.target.includes('Player')) targetSide = 'P';
+        else if (b.target.includes('Tie')) targetSide = 'T';
+
+        if (b.roundOutcome === 'T' && targetSide !== 'T') {
+          profit = 0;
+        } else if (b.roundOutcome === targetSide) {
+          if (targetSide === 'B') profit = amt * 0.95;
+          else if (targetSide === 'P') profit = amt * 1;
+          else if (targetSide === 'T') profit = amt * 8;
+        } else {
+          profit = -amt;
+        }
+
+        const sign = profit > 0 ? '+' : '';
+        const color = profit > 0 ? 'var(--green)' : (profit < 0 ? 'var(--red)' : 'var(--dim)');
+        profitHtml = `<div style="color:${color};font-size:11px;margin-top:4px;font-weight:600;">${sign}${profit.toFixed(2)}</div>`;
+      }
+      
+      let displayModuleLabel = b.targetModule;
+      if (currentActiveModules && currentActiveModules.length > 0) {
+        const matchedMod = currentActiveModules.find(m => m.label === b.targetModule || m.baseUrl === b.targetModule || (m.accounts && m.accounts[0] && m.accounts[0].label === b.targetModule));
+        if (matchedMod && matchedMod.accounts && matchedMod.accounts.length > 0 && matchedMod.accounts[0].label) {
+           displayModuleLabel = matchedMod.accounts[0].label;
+        }
+      }
+
+      let actAmountText;
+      let actStyle = '';
+
+      if (b.outcome === 'PENDING') {
+        actAmountText = '-';
+        actStyle = 'color:white;';
+      } else if (b.actualBetAmount === '-' || b.actualBetAmount == null) {
+        actAmountText = 'null';
+        actStyle = 'color:var(--red);';
+      } else {
+        actAmountText = b.actualBetAmount;
+        actStyle = 'color:white;';
+      }
+
+      return `
+        <tr>
+          <td style="color:var(--dim);">
+            <div style="color:var(--text);font-size:10px;">${dateStr}</div>
+            <div>${timeStr}</div>
+          </td>
+          <td class="col-table">
+            <div style="color:var(--cyan);font-weight:600;font-size:12px;">${b.tableName}</div>
+            <div style="color:var(--dim);font-size:10px;">Round ${b.round}</div>
+            <div style="color:var(--dim);font-size:9px;margin-top:2px;" title="${b.id}">UUID: ...${b.id.substr(-6)}</div>
+          </td>
+          <td>
+            <div class="${targetCls}"><span style="background:rgba(255,255,255,0.05);padding:2px 4px;border-radius:2px;font-weight:600;">${b.target}</span></div>
+            <div style="color:${b.ev>=0?'var(--green)':'var(--red)'};font-weight:600;margin-top:4px;">EV: ${fmtEv(b.ev)}</div>
+          </td>
+          <td>
+            <div style="color:var(--cyan);margin-bottom:4px;">${displayModuleLabel}</div>
+            <div style="color:var(--dim);display:flex;gap:12px;margin-bottom:4px;">
+              <span>Rec: <strong>${b.recommendedBetAmount}</strong></span>
+              <span style="${actStyle}">Act: <strong>${actAmountText}</strong></span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span class="${statusCls}" style="font-weight:600;">${b.outcome}</span>
+              ${b.timer != null ? `<span style="font-size:10px;padding:1px 5px;border-radius:3px;background:rgba(255,255,255,0.06);color:${b.timer >= 5 ? 'var(--green)' : (b.timer >= 3 ? 'var(--yellow)' : 'var(--red)')};font-weight:600;">⏱ ${b.timer}s</span>` : ''}
+            </div>
+            ${['UNPLACED', 'NETWORK_ERROR', 'EXPIRED', 'DISPATCH_FAILED'].includes(b.outcome) && b.executionState && b.executionState.reason ? `<div onclick="this.classList.toggle('expanded')" class="reason-truncate" title="Click to expand">${b.executionState.reason}</div>` : ''}
+          </td>
+          <td>
+            <div style="font-weight:600;font-size:14px;color:${b.roundOutcome==='UNKNOWN'?'var(--dim)':(b.roundOutcome==='WAITING'?'var(--yellow)':'var(--purple)')}">${b.roundOutcome}</div>
+            ${profitHtml}
+          </td>
+          <td class="col-details" style="text-align:right;">
+            <button class="btn-reason" onclick="toggleReason('${b.id}')">View JSON</button>
+          </td>
+        </tr>
+        <tr id="reason-${b.id}" class="reason-row ${isActive}">
+          <td colspan="6" style="padding:0;">
+            <div style="padding:10px; display:flex; gap:10px;">
+              <div style="flex:1;">
+                 <div style="color:var(--cyan);font-weight:600;margin-bottom:4px;font-size:11px;">1. Signal (From Eyes)</div>
+                 <div class="reason-content">${JSON.stringify(b.reasonState, null, 2)}</div>
+              </div>
+              <div style="flex:1;">
+                 <div style="color:var(--yellow);font-weight:600;margin-bottom:4px;font-size:11px;">2. Execution Callback</div>
+                 <div class="reason-content">${b.executionState ? JSON.stringify(b.executionState, null, 2) : '<span style="color:var(--dim)">Awaiting Execution Callback...</span>'}</div>
+              </div>
+              <div style="flex:1;">
+                 <div style="color:var(--purple);font-weight:600;margin-bottom:4px;font-size:11px;">3. Round Outcome</div>
+                 <div class="reason-content">${b.outcomeState ? JSON.stringify(b.outcomeState, null, 2) : '<span style="color:var(--dim)">Awaiting Round Outcome...</span>'}</div>
+              </div>
+            </div>
+          </td>
+        </tr>
+      `;
+    }
+
+    function updateMethodVisibility() {
+      const method = document.getElementById('cfg-method').value;
+      if (method === 'kelly') {
+        document.getElementById('group-kelly').style.display = 'block';
+        document.getElementById('group-flat').style.display = 'none';
+      } else {
+        document.getElementById('group-kelly').style.display = 'none';
+        document.getElementById('group-flat').style.display = 'block';
+      }
+    }
+
+    async function openSettings() {
+      try {
+        const res = await fetch('/api/config');
+        const data = await res.json();
+        if (data.ok) {
+           document.getElementById('cfg-autobet-outside').checked = data.config.autoBetEnabled ?? true;
+           document.getElementById('cfg-mode').value = data.config.mode || 'round_robin';
+           document.getElementById('cfg-method').value = data.config.method || 'kelly';
+           document.getElementById('cfg-bankroll').value = data.config.startingBankroll;
+           document.getElementById('cfg-kelly').value = data.config.kellyFraction;
+           document.getElementById('cfg-flat').value = data.config.flatRatio ?? 0.01;
+           document.getElementById('cfg-rounding').value = data.config.rounding;
+           document.getElementById('cfg-maxbet').value = data.config.maxBet;
+           document.getElementById('cfg-min-balance').value = data.config.minAccountBalance ?? 1000;
+           updateMethodVisibility();
+           document.getElementById('settings-modal').style.display = 'flex';
+        }
+      } catch(e) {
+        alert("Failed to load settings");
+      }
+    }
+
+    function closeSettings() {
+      document.getElementById('settings-modal').style.display = 'none';
+    }
+
+    async function toggleAutoBet() {
+      const isEnabled = document.getElementById('cfg-autobet-outside').checked;
+      try {
+        await fetch('/api/config', {
+           method: 'POST',
+           headers: { 'Content-Type': 'application/json' },
+           body: JSON.stringify({ autoBetEnabled: isEnabled })
+        });
+      } catch(e) {
+        alert("Failed to save auto bet state");
+      }
+    }
+
+    async function saveSettings() {
+      const pwd = prompt("Enter password to save settings:");
+      if (pwd !== "1234") {
+        alert("Incorrect password.");
+        return;
+      }
+
+      const payload = {
+         mode: document.getElementById('cfg-mode').value,
+         method: document.getElementById('cfg-method').value,
+         startingBankroll: parseFloat(document.getElementById('cfg-bankroll').value) || 1000,
+         kellyFraction: parseFloat(document.getElementById('cfg-kelly').value) || 1.0,
+         flatRatio: parseFloat(document.getElementById('cfg-flat').value) || 0.01,
+         rounding: parseInt(document.getElementById('cfg-rounding').value) || 10,
+         maxBet: parseInt(document.getElementById('cfg-maxbet').value) || 500,
+         minAccountBalance: parseFloat(document.getElementById('cfg-min-balance').value) || 0
+      };
+      try {
+        await fetch('/api/config', {
+           method: 'POST',
+           headers: { 'Content-Type': 'application/json' },
+           body: JSON.stringify(payload)
+        });
+        currentMinBalance = payload.minAccountBalance;
+        closeSettings();
+      } catch(e) {
+        alert("Failed to save settings");
+      }
+    }
+
+    let lastDataStr = '';
+    let currentBetsData = [];
+    let currentActiveModules = [];
+    let currentPage = 1;
+    let currentTotalBets = 0;
+
+    function openFilterModal() {
+      document.getElementById('filter-modal').style.display = 'flex';
+    }
+
+    function closeFilterModal() {
+      document.getElementById('filter-modal').style.display = 'none';
+    }
+
+    function updateFilterBadge() {
+      const statusFilter = document.getElementById('filter-status').value;
+      const outcomeFilter = document.getElementById('filter-outcome').value;
+      const startFilter = document.getElementById('filter-start').value;
+      const endFilter = document.getElementById('filter-end').value;
+      
+      let count = 0;
+      if (statusFilter !== 'ALL') count++;
+      if (outcomeFilter !== 'ALL') count++;
+      if (startFilter) count++;
+      if (endFilter) count++;
+      
+      const badge = document.getElementById('filter-badge');
+      const btn = document.getElementById('btn-open-filter');
+      if (count > 0) {
+        badge.textContent = count;
+        badge.style.display = 'block';
+        btn.style.borderColor = 'var(--cyan)';
+        btn.style.color = 'var(--cyan)';
+      } else {
+        badge.style.display = 'none';
+        btn.style.borderColor = 'var(--border)';
+        btn.style.color = 'var(--text)';
+      }
+    }
+
+    function applyFilters() {
+      currentPage = 1;
+      lastDataStr = '';
+      updateFilterBadge();
+      closeFilterModal();
+      poll();
+    }
+
+    function prevPage() {
+      if (currentPage > 1) {
+        currentPage--;
+        lastDataStr = '';
+        poll();
+      }
+    }
+
+    function nextPage() {
+      const limitFilter = parseInt(document.getElementById('filter-limit').value, 10);
+      const maxPage = Math.ceil(currentTotalBets / limitFilter) || 1;
+      if (currentPage < maxPage) {
+        currentPage++;
+        lastDataStr = '';
+        poll();
+      }
+    }
+
+    function renderBetsTable(bets) {
+      const html = bets.length 
+        ? bets.map(renderBet).join('') 
+        : '<tr><td colspan="8" style="text-align:center;color:var(--dim);padding:20px;">No bets match criteria.</td></tr>';
+      document.getElementById('tb').innerHTML = html;
+    }
+
+    async function poll(){
+      try{
+        const statusFilter = document.getElementById('filter-status').value;
+        const outcomeFilter = document.getElementById('filter-outcome').value;
+        const limitFilter = parseInt(document.getElementById('filter-limit').value, 10);
+        const startFilter = document.getElementById('filter-start').value;
+        const endFilter = document.getElementById('filter-end').value;
+        
+        const qs = new URLSearchParams({
+           page: currentPage,
+           limit: limitFilter,
+           status: statusFilter,
+           outcome: outcomeFilter,
+           t: Date.now()
+        });
+        
+        if (startFilter) qs.append('start', new Date(startFilter).toISOString());
+        if (endFilter) qs.append('end', new Date(endFilter).toISOString());
+
+        const rBets = await fetch('/api/bets?' + qs.toString());
+        
+        if(!rBets.ok) return;
+        const betsData = await rBets.json();
+        
+        let tsText = '—';
+        if (betsData.lastUpdated) {
+           const dObj = new Date(betsData.lastUpdated);
+           if (!isNaN(dObj)) tsText = dObj.toLocaleString('sv-SE', { timeZone: 'Asia/Singapore' });
+        }
+        
+        const activeModulesCount = betsData.activeModules ? betsData.activeModules.length : 0;
+        document.getElementById('ts').textContent = 'Last Updated: ' + tsText;
+        
+        // Render Modules
+        const modules = betsData.activeModules || [];
+        const successRates = betsData.successRates || {};
+        const fmtPct = (val) => val != null ? parseFloat((val * 100).toFixed(4)) + '%' : '—';
+        const now = Date.now();
+        let modHtml = '';
+        if (modules.length === 0) {
+          modHtml = '<div style="color:var(--dim);">No Bet Modules Connected. Start a module to accept bets.</div>';
+        } else {
+          for (const m of modules) {
+            // Server only sends live modules (stale ones are purged server-side)
+            let acctHtml = '';
+            if (m.accounts && m.accounts.length > 0) {
+              for (const a of m.accounts) {
+                 const isReady = a.isAcceptingBets;
+                 let readyColor = isReady ? 'var(--green)' : 'var(--yellow)';
+                 let readyText = isReady ? 'READY' : 'LAUNCHING';
+
+                 if (isReady && a.balance != null) {
+                    const cleanBalance = String(a.balance).replace(/[^0-9.]/g, '');
+                    const parsedBalance = parseFloat(cleanBalance);
+                    if (!isNaN(parsedBalance) && parsedBalance < currentMinBalance) {
+                        readyColor = 'var(--red)';
+                        readyText = 'INSUFFICIENT BALANCE';
+                    }
+                 }
+
+                 const balanceText = a.balance != null ? `<span style="color:var(--text);margin-right:10px;">Balance: <strong style="color:var(--green)">${a.balance}</strong></span>` : '';
+                 acctHtml += `<div class="acct-row">${balanceText}<span style="color:${readyColor};font-weight:600;">${readyText}</span></div>`;
+              }
+            } else {
+              acctHtml = `<div class="acct-row" style="color:var(--dim)">No accounts configured</div>`;
+            }
+            
+            let headerLabel = m.label;
+            if (m.accounts && m.accounts.length > 0) {
+              headerLabel = m.accounts[0].label;
+            }
+
+            const profitAll = m.cumulativeProfit || 0;
+            const profitSignAll = profitAll > 0 ? '+' : '';
+            const profitColorAll = profitAll > 0 ? 'var(--green)' : (profitAll < 0 ? 'var(--red)' : 'var(--text)');
+
+            const profitToday = m.todayProfit || 0;
+            const profitSignToday = profitToday > 0 ? '+' : '';
+            const profitColorToday = profitToday > 0 ? 'var(--green)' : (profitToday < 0 ? 'var(--red)' : 'var(--text)');
+
+            const modRate = successRates.moduleLast1000 ? successRates.moduleLast1000[headerLabel] : null;
+
+            modHtml += `
+              <div class="module-card">
+                <div class="m-title">
+                  <span>${headerLabel}</span>
+                  <span class="status-dot status-online" title="Last seen ${Math.round((now - m.lastHeartbeat)/1000)}s ago"></span>
+                </div>
+                <div class="m-url" style="display:flex; justify-content:flex-end; gap:12px; margin-bottom:4px;">
+                  <span style="color:${profitColorToday}; font-weight:600;" title="Today's P/L (Since 12 PM)">Today: ${profitSignToday}${profitToday.toFixed(2)}</span>
+                  <span style="color:${profitColorAll}; font-weight:600;" title="All-Time P/L">All Time: ${profitSignAll}${profitAll.toFixed(2)}</span>
+                </div>
+                ${acctHtml}
+                <div class="acct-row" style="margin-top:2px;">
+                  <span style="color:var(--purple); font-weight:600;" title="Execution Success Rate (Last 1k Bets)">SR (1000): <strong style="color:white">${fmtPct(modRate)}</strong></span>
+                </div>
+              </div>
+            `;
+          }
+        }
+        document.getElementById('modules-panel').innerHTML = modHtml;
+        
+        let srHtml = `
+          <div style="color:var(--purple);font-weight:600;margin-right:10px;">Execution Success Rate:</div>
+          <div>Last 100: <strong style="color:white;">${fmtPct(successRates.last100)}</strong></div>
+          <div>Last 1K: <strong style="color:white;">${fmtPct(successRates.last1000)}</strong></div>
+          <div>Last 10K: <strong style="color:white;">${fmtPct(successRates.last10000)}</strong></div>
+          <div>All Time: <strong style="color:white;">${fmtPct(successRates.allTime)}</strong></div>
+        `;
+        document.getElementById('success-rates-panel').innerHTML = srHtml;
+
+        currentActiveModules = betsData.activeModules || [];
+        const bets = betsData.betLog || [];
+        currentTotalBets = betsData.totalBets || 0;
+
+        document.getElementById('count').textContent = currentTotalBets + ' bets';
+        const maxPage = Math.ceil(currentTotalBets / limitFilter) || 1;
+        document.getElementById('page-info').textContent = 'Page ' + currentPage + ' of ' + maxPage;
+        
+        const currentDataStr = JSON.stringify(bets) + JSON.stringify(currentActiveModules.map(m => m.label));
+        if (currentDataStr !== lastDataStr) {
+          lastDataStr = currentDataStr;
+          currentBetsData = bets;
+          renderBetsTable(bets);
+        }
+      }catch(e){
+        // silent
+      }
+    }
+    
+    async function initSettings() {
+      try {
+        const res = await fetch('/api/config');
+        const data = await res.json();
+        if (data.ok) {
+           document.getElementById('cfg-autobet-outside').checked = data.config.autoBetEnabled ?? true;
+           currentMinBalance = data.config.minAccountBalance || 0;
+        }
+      } catch(e) {}
+    }
+    initSettings();
+    poll();
+    setInterval(poll, 1000);
+  </script>
+
+  <div class="modal-overlay" id="settings-modal">
+    <div class="modal">
+      <h2>Bet Settings</h2>
+      <div class="form-group">
+        <label>Mode</label>
+        <select id="cfg-mode" style="width:100%; background:#0d1117; border:1px solid var(--border); color:var(--text); padding:6px; font-family:inherit; border-radius:4px;">
+          <option value="round_robin">Round Robin</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Stake Sizing Method</label>
+        <select id="cfg-method" onchange="updateMethodVisibility()" style="width:100%; background:#0d1117; border:1px solid var(--border); color:var(--text); padding:6px; font-family:inherit; border-radius:4px;">
+          <option value="kelly">Kelly</option>
+          <option value="flat">Flat</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Starting Bankroll</label>
+        <input type="number" id="cfg-bankroll" />
+      </div>
+      <div class="form-group" id="group-kelly">
+        <label>Kelly Fraction (e.g. 0.5 for Half Kelly)</label>
+        <input type="number" step="0.1" id="cfg-kelly" />
+      </div>
+      <div class="form-group" id="group-flat">
+        <label>Flat Ratio (e.g. 0.01 for 1% of Bankroll)</label>
+        <input type="number" step="0.001" id="cfg-flat" />
+      </div>
+      <div class="form-group">
+        <label>Rounding (e.g. 10 to round to nearest $10)</label>
+        <input type="number" id="cfg-rounding" />
+      </div>
+      <div class="form-group">
+        <label>Max Bet Limit</label>
+        <input type="number" id="cfg-maxbet" />
+      </div>
+      <div class="form-group" id="group-min-balance">
+        <label>Min Account Balance (Round Robin)</label>
+        <input type="number" id="cfg-min-balance" />
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeSettings()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveSettings()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="filter-modal">
+    <div class="modal">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+        <h2 style="margin:0; color:var(--cyan);">Filters & Display Options</h2>
+        <button onclick="closeFilterModal()" style="background:none;border:none;color:var(--text);cursor:pointer;font-size:18px;">&times;</button>
+      </div>
+      <div class="form-group">
+        <label>Status</label>
+        <select id="filter-status" style="width:100%; background:#0d1117; border:1px solid var(--border); color:var(--text); padding:6px; font-family:inherit; border-radius:4px; outline:none;">
+          <option value="ALL">All Status</option>
+          <option value="SUCCESS">Success</option>
+          <option value="NON_SUCCESS">Non Success</option>
+          <option value="WRONG_AMOUNT">Wrong Amount</option>
+          <option value="UNPLACED">Unplaced</option>
+          <option value="FAILED">Failed</option>
+          <option value="PENDING">Pending</option>
+          <option value="AUTOBET_OFF">Autobet Off</option>
+          <option value="NO_MODULES_ONLINE">No Modules Online</option>
+          <option value="NETWORK_ERROR">Network Error</option>
+          <option value="EXPIRED">Expired</option>
+          <option value="DISPATCH_FAILED">Dispatch Failed</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Round Outcome</label>
+        <select id="filter-outcome" style="width:100%; background:#0d1117; border:1px solid var(--border); color:var(--text); padding:6px; font-family:inherit; border-radius:4px; outline:none;">
+          <option value="ALL">All Outcomes</option>
+          <option value="WAITING">Waiting</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Start Date</label>
+        <input type="datetime-local" id="filter-start" style="color-scheme: dark; width:100%; background:#0d1117; border:1px solid var(--border); color:var(--text); padding:6px; font-family:inherit; border-radius:4px; outline:none;">
+      </div>
+      <div class="form-group">
+        <label>End Date</label>
+        <input type="datetime-local" id="filter-end" style="color-scheme: dark; width:100%; background:#0d1117; border:1px solid var(--border); color:var(--text); padding:6px; font-family:inherit; border-radius:4px; outline:none;">
+      </div>
+      <div class="form-group">
+        <label>Rows per page</label>
+        <select id="filter-limit" style="width:100%; background:#0d1117; border:1px solid var(--border); color:var(--text); padding:6px; font-family:inherit; border-radius:4px; outline:none;">
+          <option value="10">10 per page</option>
+          <option value="25">25 per page</option>
+          <option value="50">50 per page</option>
+          <option value="100" selected>100 per page</option>
+          <option value="500">500 per page</option>
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeFilterModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="applyFilters()">Save Filters</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

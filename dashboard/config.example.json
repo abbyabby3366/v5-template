@@ -1,0 +1,14 @@
+{
+  "startingBankroll": 10000,
+  "kellyFraction": 0.9,
+  "rounding": 10,
+  "maxBet": 500,
+  "method": "kelly",
+  "flatRatio": 0.02,
+  "autoBetEnabled": true,
+  "ignoredTables": [],
+  "rebateRate": 0.012,
+  "minEvThreshold": 0.0015,
+  "mode": "round_robin",
+  "minAccountBalance": 0
+}

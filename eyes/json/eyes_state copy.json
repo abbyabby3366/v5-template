@@ -1,0 +1,3111 @@
+{
+    "savedAt": "2026-05-25T05:20:08.772Z",
+    "tables": {
+        "Prettyico116": {
+            "tableName": "Prettyico116",
+            "lastState": "Dealing",
+            "lastRound": 55,
+            "deckComposition": [
+                31,
+                29,
+                26,
+                29,
+                31,
+                28,
+                22,
+                29,
+                29,
+                29,
+                31,
+                30,
+                27
+            ],
+            "handNumber": 9,
+            "lastFinalizedRound": 54,
+            "lastPlayerCards": [
+                "8C",
+                "KD"
+            ],
+            "lastBankerCards": [
+                "4D",
+                "6C"
+            ],
+            "lastEvResult": {
+                "p_player": 0.44705795202960097,
+                "p_banker": 0.45893316920735616,
+                "p_tie": 0.09400887876299414,
+                "ev_player_base": -0.013107432180507311,
+                "ev_banker_base": -0.012220253624005372,
+                "ev_player": -0.0011074321805073107,
+                "ev_banker": -0.0002202536240053718,
+                "ev_tie": -0.1419200911330527,
+                "rebate": 0.012,
+                "remaining": 371,
+                "best": null
+            },
+            "bufferedCards": {
+                "player": [],
+                "banker": []
+            },
+            "currentBetId": null,
+            "consecutiveZeroCardHands": 0,
+            "lastErrorResetReason": null,
+            "lastErrorResetTime": null,
+            "deducedBeadRoad": [
+                {
+                    "round": 54,
+                    "winner": "P",
+                    "playerCards": [
+                        "8C",
+                        "KD"
+                    ],
+                    "bankerCards": [
+                        "4D",
+                        "6C"
+                    ]
+                }
+            ]
+        },
+        "PrettyMG07": {
+            "tableName": "PrettyMG07",
+            "lastState": "Dealing",
+            "lastRound": 35,
+            "deckComposition": [
+                31,
+                32,
+                27,
+                27,
+                30,
+                29,
+                25,
+                26,
+                29,
+                28,
+                28,
+                29,
+                27
+            ],
+            "handNumber": 9,
+            "lastFinalizedRound": 34,
+            "lastPlayerCards": [
+                "8S",
+                "3H",
+                "6D"
+            ],
+            "lastBankerCards": [
+                "KC",
+                "7D"
+            ],
+            "lastEvResult": {
+                "p_player": 0.44637448879571967,
+                "p_banker": 0.4585201473600432,
+                "p_tie": 0.09510536384416125,
+                "ev_player_base": -0.013422179863858602,
+                "ev_banker_base": -0.011913374632737858,
+                "ev_player": -0.0014221798638586018,
+                "ev_banker": 0.00008662536726214247,
+                "ev_tie": -0.13205172540254873,
+                "rebate": 0.012,
+                "remaining": 368,
+                "best": null
+            },
+            "bufferedCards": {
+                "player": [],
+                "banker": []
+            },
+            "currentBetId": null,
+            "consecutiveZeroCardHands": 0,
+            "lastErrorResetReason": null,
+            "lastErrorResetTime": null,
+            "deducedBeadRoad": [
+                {
+                    "round": 34,
+                    "winner": "T",
+                    "playerCards": [
+                        "8S",
+                        "3H",
+                        "6D"
+                    ],
+                    "bankerCards": [
+                        "KC",
+                        "7D"
+                    ]
+                }
+            ]
+        },
+        "PrettyMG06": {
+            "tableName": "PrettyMG06",
+            "lastState": "Dealing",
+            "lastRound": 49,
+            "deckComposition": [
+                28,
+                31,
+                28,
+                32,
+                23,
+                27,
+                27,
+                30,
+                27,
+                25,
+                30,
+                30,
+                31
+            ],
+            "handNumber": 9,
+            "lastFinalizedRound": 48,
+            "lastPlayerCards": [
+                "3H",
+                "10H",
+                "AH"
+            ],
+            "lastBankerCards": [
+                "6C",
+                "7C",
+                "6D"
+            ],
+            "lastEvResult": {
+                "p_player": 0.4472165892970062,
+                "p_banker": 0.4582217263854663,
+                "p_tie": 0.09456168431754794,
+                "ev_player_base": -0.012154485731217397,
+                "ev_banker_base": -0.013149376412063079,
+                "ev_player": -0.00015448573121739674,
+                "ev_banker": -0.0011493764120630787,
+                "ev_tie": -0.1369448411420685,
+                "rebate": 0.012,
+                "remaining": 369,
+                "best": null
+            },
+            "bufferedCards": {
+                "player": [],
+                "banker": []
+            },
+            "currentBetId": null,
+            "consecutiveZeroCardHands": 0,
+            "lastErrorResetReason": null,
+            "lastErrorResetTime": null,
+            "deducedBeadRoad": [
+                {
+                    "round": 48,
+                    "winner": "B",
+                    "playerCards": [
+                        "3H",
+                        "10H",
+                        "AH"
+                    ],
+                    "bankerCards": [
+                        "6C",
+                        "7C",
+                        "6D"
+                    ]
+                }
+            ]
+        },
+        "PrettyMG05": {
+            "tableName": "PrettyMG05",
+            "lastState": "Dealing",
+            "lastRound": 50,
+            "deckComposition": [
+                30,
+                27,
+                29,
+                32,
+                26,
+                25,
+                30,
+                29,
+                29,
+                28,
+                28,
+                31,
+                30
+            ],
+            "handNumber": 9,
+            "lastFinalizedRound": 49,
+            "lastPlayerCards": [
+                "6D",
+                "8H",
+                "2H"
+            ],
+            "lastBankerCards": [
+                "2S",
+                "10S",
+                "5S"
+            ],
+            "lastEvResult": {
+                "p_player": 0.44704154628697046,
+                "p_banker": 0.4583740133633487,
+                "p_tie": 0.09458444034961683,
+                "ev_player_base": -0.0125163158017242,
+                "ev_banker_base": -0.012796592093318954,
+                "ev_player": -0.000516315801724199,
+                "ev_banker": -0.0007965920933189537,
+                "ev_tie": -0.1367400368534486,
+                "rebate": 0.012,
+                "remaining": 374,
+                "best": null
+            },
+            "bufferedCards": {
+                "player": [],
+                "banker": []
+            },
+            "currentBetId": null,
+            "consecutiveZeroCardHands": 0,
+            "lastErrorResetReason": null,
+            "lastErrorResetTime": null,
+            "deducedBeadRoad": [
+                {
+                    "round": 49,
+                    "winner": "B",
+                    "playerCards": [
+                        "6D",
+                        "8H",
+                        "2H"
+                    ],
+                    "bankerCards": [
+                        "2S",
+                        "10S",
+                        "5S"
+                    ]
+                }
+            ]
+        },
+        "PrettyMG04": {
+            "tableName": "PrettyMG04",
+            "lastState": "Dealing",
+            "lastRound": 46,
+            "deckComposition": [
+                28,
+                27,
+                28,
+                29,
+                29,
+                29,
+                31,
+                27,
+                26,
+                28,
+                29,
+                28,
+                30
+            ],
+            "handNumber": 9,
+            "lastFinalizedRound": 45,
+            "lastPlayerCards": [
+                "10C",
+                "QS",
+                "2S"
+            ],
+            "lastBankerCards": [
+                "2C",
+                "KS",
+                "5D"
+            ],
+            "lastEvResult": {
+                "p_player": 0.4458292150049164,
+                "p_banker": 0.4584262314116176,
+                "p_tie": 0.09574455358276437,
+                "ev_player_base": -0.013930816183216585,
+                "ev_banker_base": -0.01141745422136387,
+                "ev_player": -0.0019308161832165844,
+                "ev_banker": 0.0005825457786361298,
+                "ev_tie": -0.12629901775512065,
+                "rebate": 0.012,
+                "remaining": 369,
+                "best": null
+            },
+            "bufferedCards": {
+                "player": [],
+                "banker": []
+            },
+            "currentBetId": null,
+            "consecutiveZeroCardHands": 0,
+            "lastErrorResetReason": null,
+            "lastErrorResetTime": null,
+            "deducedBeadRoad": [
+                {
+                    "round": 45,
+                    "winner": "B",
+                    "playerCards": [
+                        "10C",
+                        "QS",
+                        "2S"
+                    ],
+                    "bankerCards": [
+                        "2C",
+                        "KS",
+                        "5D"
+                    ]
+                }
+            ]
+        },
+        "PrettyMG03": {
+            "tableName": "PrettyMG03",
+            "lastState": "Waiting for Bets",
+            "lastRound": 35,
+            "deckComposition": [
+                30,
+                32,
+                31,
+                29,
+                30,
+                31,
+                30,
+                29,
+                31,
+                25,
+                31,
+                29,
+                28
+            ],
+            "handNumber": 6,
+            "lastFinalizedRound": 34,
+            "lastPlayerCards": [
+                "KC",
+                "5S",
+                "KH"
+            ],
+            "lastBankerCards": [
+                "10H",
+                "10H",
+                "8S"
+            ],
+            "lastEvResult": {
+                "p_player": 0.44584646563758434,
+                "p_banker": 0.45836025906101135,
+                "p_tie": 0.09579327530178817,
+                "ev_player_base": -0.013839527047974903,
+                "ev_banker_base": -0.011506461128224475,
+                "ev_player": -0.0018395270479749024,
+                "ev_banker": 0.000493538871775525,
+                "ev_tie": -0.12586052228390643,
+                "rebate": 0.012,
+                "remaining": 386,
+                "best": null
+            },
+            "bufferedCards": {
+                "player": [],
+                "banker": []
+            },
+            "currentBetId": null,
+            "consecutiveZeroCardHands": 0,
+            "lastErrorResetReason": null,
+            "lastErrorResetTime": null,
+            "deducedBeadRoad": [
+                {
+                    "round": 34,
+                    "winner": "B",
+                    "playerCards": [
+                        "KC",
+                        "5S",
+                        "KH"
+                    ],
+                    "bankerCards": [
+                        "10H",
+                        "10H",
+                        "8S"
+                    ]
+                }
+            ]
+        },
+        "PrettyMG02": {
+            "tableName": "PrettyMG02",
+            "lastState": "Waiting for Bets",
+            "lastRound": 13,
+            "deckComposition": [
+                29,
+                27,
+                28,
+                31,
+                29,
+                30,
+                25,
+                29,
+                29,
+                31,
+                29,
+                31,
+                29
+            ],
+            "handNumber": 8,
+            "lastFinalizedRound": 12,
+            "lastPlayerCards": [
+                "7C",
+                "6S",
+                "7S"
+            ],
+            "lastBankerCards": [
+                "7C",
+                "10S"
+            ],
+            "lastEvResult": {
+                "p_player": 0.44677182092546514,
+                "p_banker": 0.458741383239693,
+                "p_tie": 0.09448679583483485,
+                "ev_player_base": -0.013218539784036884,
+                "ev_banker_base": -0.012111923710564073,
+                "ev_player": -0.0012185397840368834,
+                "ev_banker": -0.00011192371056407274,
+                "ev_tie": -0.1376188374864863,
+                "rebate": 0.012,
+                "remaining": 377,
+                "best": null
+            },
+            "bufferedCards": {
+                "player": [],
+                "banker": []
+            },
+            "currentBetId": null,
+            "consecutiveZeroCardHands": 0,
+            "lastErrorResetReason": null,
+            "lastErrorResetTime": null,
+            "deducedBeadRoad": [
+                {
+                    "round": 12,
+                    "winner": "B",
+                    "playerCards": [
+                        "7C",
+                        "6S",
+                        "7S"
+                    ],
+                    "bankerCards": [
+                        "7C",
+                        "10S"
+                    ]
+                }
+            ]
+        },
+        "PrettyMG01": {
+            "tableName": "PrettyMG01",
+            "lastState": "Waiting for Bets",
+            "lastRound": 55,
+            "deckComposition": [
+                26,
+                26,
+                27,
+                28,
+                29,
+                25,
+                32,
+                29,
+                28,
+                29,
+                31,
+                30,
+                29
+            ],
+            "handNumber": 10,
+            "lastFinalizedRound": 54,
+            "lastPlayerCards": [
+                "QS",
+                "4H"
+            ],
+            "lastBankerCards": [
+                "3C",
+                "5D"
+            ],
+            "lastEvResult": {
+                "p_player": 0.44626770669234045,
+                "p_banker": 0.45892954647566664,
+                "p_tie": 0.09480274683171258,
+                "ev_player_base": -0.013987934385585368,
+                "ev_banker_base": -0.011361763974054293,
+                "ev_player": -0.0019879343855853677,
+                "ev_banker": 0.0006382360259457077,
+                "ev_tie": -0.13477527851458682,
+                "rebate": 0.012,
+                "remaining": 369,
+                "best": null
+            },
+            "bufferedCards": {
+                "player": [],
+                "banker": []
+            },
+            "currentBetId": null,
+            "consecutiveZeroCardHands": 0,
+            "lastErrorResetReason": null,
+            "lastErrorResetTime": null,
+            "deducedBeadRoad": [
+                {
+                    "round": 54,
+                    "winner": "B",
+                    "playerCards": [
+                        "QS",
+                        "4H"
+                    ],
+                    "bankerCards": [
+                        "3C",
+                        "5D"
+                    ]
+                }
+            ]
+        },
+        "PrettyMG08": {
+            "tableName": "PrettyMG08",
+            "lastState": "Result (Player Win)",
+            "lastRound": 40,
+            "deckComposition": [
+                26,
+                28,
+                29,
+                27,
+                31,
+                26,
+                28,
+                27,
+                28,
+                27,
+                30,
+                29,
+                31
+            ],
+            "handNumber": 10,
+            "lastFinalizedRound": 40,
+            "lastPlayerCards": [
+                "10S",
+                "8H"
+            ],
+            "lastBankerCards": [
+                "AH",
+                "3S"
+            ],
+            "lastEvResult": {
+                "p_player": 0.44643354777847655,
+                "p_banker": 0.4588531929087598,
+                "p_tie": 0.09471325931275261,
+                "ev_player_base": -0.013719018043780312,
+                "ev_banker_base": -0.011623957407314221,
+                "ev_player": -0.001719018043780312,
+                "ev_banker": 0.00037604259268577897,
+                "ev_tie": -0.13558066618522646,
+                "rebate": 0.012,
+                "remaining": 367,
+                "best": null
+            },
+            "bufferedCards": {
+                "player": [],
+                "banker": []
+            },
+            "currentBetId": null,
+            "consecutiveZeroCardHands": 0,
+            "lastErrorResetReason": null,
+            "lastErrorResetTime": null,
+            "deducedBeadRoad": [
+                {
+                    "round": 39,
+                    "winner": "B",
+                    "playerCards": [
+                        "4D",
+                        "6S",
+                        "3H"
+                    ],
+                    "bankerCards": [
+                        "6D",
+                        "8C",
+                        "2S"
+                    ]
+                },
+                {
+                    "round": 40,
+                    "winner": "P",
+                    "playerCards": [
+                        "10S",
+                        "8H"
+                    ],
+                    "bankerCards": [
+                        "AH",
+                        "3S"
+                    ]
+                }
+            ]
+        },
+        "PrettyMG09": {
+            "tableName": "PrettyMG09",
+            "lastState": "Waiting for Bets",
+            "lastRound": 53,
+            "deckComposition": [
+                29,
+                31,
+                26,
+                29,
+                29,
+                28,
+                30,
+                31,
+                29,
+                29,
+                26,
+                29,
+                28
+            ],
+            "handNumber": 8,
+            "lastFinalizedRound": 52,
+            "lastPlayerCards": [
+                "5H",
+                "7C"
+            ],
+            "lastBankerCards": [
+                "JC",
+                "9C"
+            ],
+            "lastEvResult": {
+                "p_player": 0.44607916389494584,
+                "p_banker": 0.45870029732281686,
+                "p_tie": 0.09522053878167112,
+                "ev_player_base": -0.013949403107453347,
+                "ev_banker_base": -0.011399331970233004,
+                "ev_player": -0.0019494031074533472,
+                "ev_banker": 0.0006006680297669965,
+                "ev_tie": -0.13101515096495986,
+                "rebate": 0.012,
+                "remaining": 374,
+                "best": null
+            },
+            "bufferedCards": {
+                "player": [],
+                "banker": []
+            },
+            "currentBetId": null,
+            "consecutiveZeroCardHands": 0,
+            "lastErrorResetReason": null,
+            "lastErrorResetTime": null,
+            "deducedBeadRoad": [
+                {
+                    "round": 52,
+                    "winner": "B",
+                    "playerCards": [
+                        "5H",
+                        "7C"
+                    ],
+                    "bankerCards": [
+                        "JC",
+                        "9C"
+                    ]
+                }
+            ]
+        },
+        "PrettyMG10": {
+            "tableName": "PrettyMG10",
+            "lastState": "Waiting for Bets",
+            "lastRound": 48,
+            "deckComposition": [
+                27,
+                24,
+                31,
+                29,
+                28,
+                30,
+                27,
+                30,
+                27,
+                29,
+                29,
+                30,
+                30
+            ],
+            "handNumber": 9,
+            "lastFinalizedRound": 47,
+            "lastPlayerCards": [
+                "8C",
+                "QS"
+            ],
+            "lastBankerCards": [
+                "9C",
+                "9H"
+            ],
+            "lastEvResult": {
+                "p_player": 0.446380859330447,
+                "p_banker": 0.45878981682060976,
+                "p_tie": 0.09482932384900614,
+                "ev_player_base": -0.013708969829787006,
+                "ev_banker_base": -0.011633754415957716,
+                "ev_player": -0.0017089698297870059,
+                "ev_banker": 0.00036624558404228444,
+                "ev_tie": -0.1345360853589448,
+                "rebate": 0.012,
+                "remaining": 371,
+                "best": null
+            },
+            "bufferedCards": {
+                "player": [],
+                "banker": []
+            },
+            "currentBetId": null,
+            "consecutiveZeroCardHands": 0,
+            "lastErrorResetReason": null,
+            "lastErrorResetTime": null,
+            "deducedBeadRoad": [
+                {
+                    "round": 47,
+                    "winner": "T",
+                    "playerCards": [
+                        "8C",
+                        "QS"
+                    ],
+                    "bankerCards": [
+                        "9C",
+                        "9H"
+                    ]
+                }
+            ]
+        },
+        "PrettyMG11": {
+            "tableName": "PrettyMG11",
+            "lastState": "Waiting for Bets",
+            "lastRound": 43,
+            "deckComposition": [
+                28,
+                30,
+                29,
+                28,
+                28,
+                32,
+                26,
+                28,
+                29,
+                29,
+                30,
+                26,
+                28
+            ],
+            "handNumber": 10,
+            "lastFinalizedRound": 42,
+            "lastPlayerCards": [
+                "QD",
+                "AS"
+            ],
+            "lastBankerCards": [
+                "QH",
+                "8H"
+            ],
+            "lastEvResult": {
+                "p_player": 0.4460367429064486,
+                "p_banker": 0.45853255110179714,
+                "p_tie": 0.09543070599157336,
+                "ev_player_base": -0.013814097248402294,
+                "ev_banker_base": -0.011531255182807808,
+                "ev_player": -0.0018140972484022942,
+                "ev_banker": 0.0004687448171921925,
+                "ev_tie": -0.12912364607583982,
+                "rebate": 0.012,
+                "remaining": 371,
+                "best": null
+            },
+            "bufferedCards": {
+                "player": [],
+                "banker": []
+            },
+            "currentBetId": null,
+            "consecutiveZeroCardHands": 0,
+            "lastErrorResetReason": null,
+            "lastErrorResetTime": null,
+            "deducedBeadRoad": [
+                {
+                    "round": 42,
+                    "winner": "B",
+                    "playerCards": [
+                        "QD",
+                        "AS"
+                    ],
+                    "bankerCards": [
+                        "QH",
+                        "8H"
+                    ]
+                }
+            ]
+        },
+        "PrettyMG12": {
+            "tableName": "PrettyMG12",
+            "lastState": "Waiting for Bets",
+            "lastRound": 69,
+            "deckComposition": [
+                31,
+                31,
+                29,
+                27,
+                30,
+                32,
+                30,
+                27,
+                29,
+                31,
+                29,
+                30,
+                32
+            ],
+            "handNumber": 6,
+            "lastFinalizedRound": 68,
+            "lastPlayerCards": [
+                "8H",
+                "9H"
+            ],
+            "lastBankerCards": [
+                "9H",
+                "7D"
+            ],
+            "lastEvResult": {
+                "p_player": 0.4458923570908651,
+                "p_banker": 0.45861317976995714,
+                "p_tie": 0.09549446313924606,
+                "ev_player_base": -0.014063841691053573,
+                "ev_banker_base": -0.011287754351222801,
+                "ev_player": -0.0020638416910535723,
+                "ev_banker": 0.0007122456487771989,
+                "ev_tie": -0.12854983174678547,
+                "rebate": 0.012,
+                "remaining": 388,
+                "best": null
+            },
+            "bufferedCards": {
+                "player": [],
+                "banker": []
+            },
+            "currentBetId": null,
+            "consecutiveZeroCardHands": 0,
+            "lastErrorResetReason": null,
+            "lastErrorResetTime": null,
+            "deducedBeadRoad": [
+                {
+                    "round": 68,
+                    "winner": "P",
+                    "playerCards": [
+                        "8H",
+                        "9H"
+                    ],
+                    "bankerCards": [
+                        "9H",
+                        "7D"
+                    ]
+                }
+            ]
+        },
+        "Prettyonsexy01": {
+            "tableName": "Prettyonsexy01",
+            "lastState": "Waiting for Bets",
+            "lastRound": 11,
+            "deckComposition": [
+                29,
+                29,
+                26,
+                30,
+                25,
+                28,
+                29,
+                30,
+                32,
+                31,
+                30,
+                28,
+                30
+            ],
+            "handNumber": 8,
+            "lastFinalizedRound": 10,
+            "lastPlayerCards": [
+                "QH",
+                "8H"
+            ],
+            "lastBankerCards": [
+                "6H",
+                "3D"
+            ],
+            "lastEvResult": {
+                "p_player": 0.4467736456838548,
+                "p_banker": 0.45877494967830373,
+                "p_tie": 0.09445140463776412,
+                "ev_player_base": -0.013253075600707234,
+                "ev_banker_base": -0.012078251289310489,
+                "ev_player": -0.0012530756007072333,
+                "ev_banker": -0.00007825128931048843,
+                "ev_tie": -0.13793735826012288,
+                "rebate": 0.012,
+                "remaining": 377,
+                "best": null
+            },
+            "bufferedCards": {
+                "player": [],
+                "banker": []
+            },
+            "currentBetId": null,
+            "consecutiveZeroCardHands": 0,
+            "lastErrorResetReason": null,
+            "lastErrorResetTime": null,
+            "deducedBeadRoad": [
+                {
+                    "round": 10,
+                    "winner": "B",
+                    "playerCards": [
+                        "QH",
+                        "8H"
+                    ],
+                    "bankerCards": [
+                        "6H",
+                        "3D"
+                    ]
+                }
+            ]
+        },
+        "Prettyonsexy02": {
+            "tableName": "Prettyonsexy02",
+            "lastState": "Waiting for Bets",
+            "lastRound": 51,
+            "deckComposition": [
+                31,
+                31,
+                28,
+                30,
+                30,
+                29,
+                30,
+                28,
+                29,
+                29,
+                26,
+                28,
+                30
+            ],
+            "handNumber": 8,
+            "lastFinalizedRound": 50,
+            "lastPlayerCards": [
+                "6D",
+                "KS"
+            ],
+            "lastBankerCards": [
+                "8S",
+                "7S",
+                "KC"
+            ],
+            "lastEvResult": {
+                "p_player": 0.4460655716592871,
+                "p_banker": 0.4583185268856232,
+                "p_tie": 0.09561590145495484,
+                "ev_player_base": -0.01354839746303612,
+                "ev_banker_base": -0.011790312473539817,
+                "ev_player": -0.0015483974630361198,
+                "ev_banker": 0.0002096875264601828,
+                "ev_tie": -0.12745688690540646,
+                "rebate": 0.012,
+                "remaining": 379,
+                "best": null
+            },
+            "bufferedCards": {
+                "player": [],
+                "banker": []
+            },
+            "currentBetId": null,
+            "consecutiveZeroCardHands": 0,
+            "lastErrorResetReason": null,
+            "lastErrorResetTime": null,
+            "deducedBeadRoad": [
+                {
+                    "round": 50,
+                    "winner": "P",
+                    "playerCards": [
+                        "6D",
+                        "KS"
+                    ],
+                    "bankerCards": [
+                        "8S",
+                        "7S",
+                        "KC"
+                    ]
+                }
+            ]
+        },
+        "Prettyonsexy03": {
+            "tableName": "Prettyonsexy03",
+            "lastState": "Dealing",
+            "lastRound": 8,
+            "deckComposition": [
+                30,
+                31,
+                28,
+                30,
+                30,
+                32,
+                31,
+                30,
+                27,
+                28,
+                32,
+                31,
+                31
+            ],
+            "handNumber": 5,
+            "lastFinalizedRound": 7,
+            "lastPlayerCards": [
+                "4S",
+                "8S",
+                "9D"
+            ],
+            "lastBankerCards": [
+                "5C",
+                "5D",
+                "3C"
+            ],
+            "lastEvResult": {
+                "p_player": 0.4458916243288701,
+                "p_banker": 0.45853097009076654,
+                "p_tie": 0.09557740558020637,
+                "ev_player_base": -0.013975044232510647,
+                "ev_banker_base": -0.01137433187330214,
+                "ev_player": -0.0019750442325106466,
+                "ev_banker": 0.0006256681266978599,
+                "ev_tie": -0.12780334977814267,
+                "rebate": 0.012,
+                "remaining": 391,
+                "best": null
+            },
+            "bufferedCards": {
+                "player": [],
+                "banker": []
+            },
+            "currentBetId": null,
+            "consecutiveZeroCardHands": 0,
+            "lastErrorResetReason": null,
+            "lastErrorResetTime": null,
+            "deducedBeadRoad": [
+                {
+                    "round": 7,
+                    "winner": "B",
+                    "playerCards": [
+                        "4S",
+                        "8S",
+                        "9D"
+                    ],
+                    "bankerCards": [
+                        "5C",
+                        "5D",
+                        "3C"
+                    ]
+                }
+            ]
+        },
+        "Prettyonsexy04": {
+            "tableName": "Prettyonsexy04",
+            "lastState": "Waiting for Bets",
+            "lastRound": 5,
+            "deckComposition": [
+                30,
+                31,
+                31,
+                30,
+                32,
+                31,
+                32,
+                32,
+                31,
+                32,
+                30,
+                32,
+                32
+            ],
+            "handNumber": 2,
+            "lastFinalizedRound": 4,
+            "lastPlayerCards": [
+                "AH",
+                "3D",
+                "2H"
+            ],
+            "lastBankerCards": [
+                "4D",
+                "JS",
+                "4S"
+            ],
+            "lastEvResult": {
+                "p_player": 0.44609416502827415,
+                "p_banker": 0.45880401359088424,
+                "p_tie": 0.09510182138082313,
+                "ev_player_base": -0.01404561183005679,
+                "ev_banker_base": -0.01130552846569464,
+                "ev_player": -0.00204561183005679,
+                "ev_banker": 0.0006944715343053607,
+                "ev_tie": -0.13208360757259185,
+                "rebate": 0.012,
+                "remaining": 406,
+                "best": null
+            },
+            "bufferedCards": {
+                "player": [],
+                "banker": []
+            },
+            "currentBetId": null,
+            "consecutiveZeroCardHands": 0,
+            "lastErrorResetReason": null,
+            "lastErrorResetTime": null,
+            "deducedBeadRoad": [
+                {
+                    "round": 4,
+                    "winner": "B",
+                    "playerCards": [
+                        "AH",
+                        "3D",
+                        "2H"
+                    ],
+                    "bankerCards": [
+                        "4D",
+                        "JS",
+                        "4S"
+                    ]
+                }
+            ]
+        },
+        "Prettyonsexy05": {
+            "tableName": "Prettyonsexy05",
+            "lastState": "Shuffling",
+            "lastRound": 50,
+            "deckComposition": [
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32,
+                32
+            ],
+            "handNumber": 0,
+            "lastFinalizedRound": 50,
+            "lastPlayerCards": [],
+            "lastBankerCards": [],
+            "lastEvResult": null,
+            "bufferedCards": {
+                "player": [],
+                "banker": []
+            },
+            "currentBetId": null,
+            "consecutiveZeroCardHands": 0,
+            "lastErrorResetReason": null,
+            "lastErrorResetTime": null,
+            "deducedBeadRoad": []
+        },
+        "PrettyXPG92": {
+            "tableName": "PrettyXPG92",
+            "lastState": "Dealing",
+            "lastRound": 38,
+            "deckComposition": [
+                26,
+                31,
+                29,
+                30,
+                29,
+                28,
+                25,
+                26,
+                25,
+                30,
+                29,
+                29,
+                30
+            ],
+            "handNumber": 10,
+            "lastFinalizedRound": 37,
+            "lastPlayerCards": [
+                "3S",
+                "6D"
+            ],
+            "lastBankerCards": [
+                "7D",
+                "8C"
+            ],
+            "lastEvResult": {
+                "p_player": 0.4468080312531093,
+                "p_banker": 0.45819892740396045,
+                "p_tie": 0.09499304134369528,
+                "ev_player_base": -0.012586528801672398,
+                "ev_banker_base": -0.012728134418369447,
+                "ev_player": -0.000586528801672398,
+                "ev_banker": -0.0007281344183694468,
+                "ev_tie": -0.1330626279067425,
+                "rebate": 0.012,
+                "remaining": 367,
+                "best": null
+            },
+            "bufferedCards": {
+                "player": [],
+                "banker": []
+            },
+            "currentBetId": null,
+            "consecutiveZeroCardHands": 0,
+            "lastErrorResetReason": null,
+            "lastErrorResetTime": null,
+            "deducedBeadRoad": [
+                {
+                    "round": 37,
+                    "winner": "P",
+                    "playerCards": [
+                        "3S",
+                        "6D"
+                    ],
+                    "bankerCards": [
+                        "7D",
+                        "8C"
+                    ]
+                }
+            ]
+        },
+        "PrettyXPG93": {
+            "tableName": "PrettyXPG93",
+            "lastState": "Dealing",
+            "lastRound": 71,
+            "deckComposition": [
+                24,
+                29,
+                24,
+                31,
+                28,
+                30,
+                27,
+                28,
+                29,
+                29,
+                29,
+                31,
+                28
+            ],
+            "handNumber": 10,
+            "lastFinalizedRound": 70,
+            "lastPlayerCards": [
+                "5S",
+                "KC"
+            ],
+            "lastBankerCards": [
+                "8S",
+                "10C"
+            ],
+            "lastEvResult": {
+                "p_player": 0.44625756686000106,
+                "p_banker": 0.45873112666451327,
+                "p_tie": 0.09501130647554618,
+                "ev_player_base": -0.01378311120764772,
+                "ev_banker_base": -0.011561466572543474,
+                "ev_player": -0.0017831112076477206,
+                "ev_banker": 0.0004385334274565264,
+                "ev_tie": -0.13289824172008435,
+                "rebate": 0.012,
+                "remaining": 367,
+                "best": null
+            },
+            "bufferedCards": {
+                "player": [],
+                "banker": []
+            },
+            "currentBetId": null,
+            "consecutiveZeroCardHands": 0,
+            "lastErrorResetReason": null,
+            "lastErrorResetTime": null,
+            "deducedBeadRoad": [
+                {
+                    "round": 70,
+                    "winner": "B",
+                    "playerCards": [
+                        "5S",
+                        "KC"
+                    ],
+                    "bankerCards": [
+                        "8S",
+                        "10C"
+                    ]
+                }
+            ]
+        }
+    },
+    "eventLog": [
+        {
+            "time": "2026-05-25T05:20:07.787Z",
+            "type": "STATE_CHANGE",
+            "table": "Prettyonsexy01",
+            "round": 11,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 377,
+            "ev": {
+                "player": -0.0012530756007072333,
+                "banker": -0.00007825128931048843,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:20:07.787Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyMG09",
+            "round": 53,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 374,
+            "ev": {
+                "player": -0.0019494031074533472,
+                "banker": 0.0006006680297669965,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:20:07.787Z",
+            "type": "HAND_COMPLETE",
+            "table": "PrettyMG08",
+            "round": 40,
+            "winner": "P",
+            "playerCards": [
+                "10S",
+                "8H"
+            ],
+            "bankerCards": [
+                "AH",
+                "3S"
+            ],
+            "cardsSubtracted": 4,
+            "deckRemaining": 367,
+            "ev": {
+                "player": -0.001719018043780312,
+                "banker": 0.00037604259268577897,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:20:07.787Z",
+            "type": "STATE_CHANGE",
+            "table": "Prettyico116",
+            "round": 55,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 371,
+            "ev": {
+                "player": -0.0011074321805073107,
+                "banker": -0.0002202536240053718,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:20:06.771Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyMG02",
+            "round": 13,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 377,
+            "ev": {
+                "player": -0.0012185397840368834,
+                "banker": -0.00011192371056407274,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:20:06.771Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyMG06",
+            "round": 49,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 369,
+            "ev": {
+                "player": -0.00015448573121739674,
+                "banker": -0.0011493764120630787,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:20:05.768Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyXPG93",
+            "round": 71,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 367,
+            "ev": {
+                "player": -0.0017831112076477206,
+                "banker": 0.0004385334274565264,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:20:05.768Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyMG10",
+            "round": 48,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 371,
+            "ev": {
+                "player": -0.0017089698297870059,
+                "banker": 0.00036624558404228444,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:20:05.768Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyMG01",
+            "round": 55,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 369,
+            "ev": {
+                "player": -0.0019879343855853677,
+                "banker": 0.0006382360259457077,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:20:03.756Z",
+            "type": "STATE_CHANGE",
+            "table": "Prettyonsexy04",
+            "round": 5,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 406,
+            "ev": {
+                "player": -0.00204561183005679,
+                "banker": 0.0006944715343053607,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:20:03.756Z",
+            "type": "HAND_COMPLETE",
+            "table": "PrettyMG09",
+            "round": 52,
+            "winner": "B",
+            "playerCards": [
+                "5H",
+                "7C"
+            ],
+            "bankerCards": [
+                "JC",
+                "9C"
+            ],
+            "cardsSubtracted": 4,
+            "deckRemaining": 374,
+            "ev": {
+                "player": -0.0019494031074533472,
+                "banker": 0.0006006680297669965,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:20:02.760Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyMG12",
+            "round": 69,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 388,
+            "ev": {
+                "player": -0.0020638416910535723,
+                "banker": 0.0007122456487771989,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:20:02.760Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyMG04",
+            "round": 46,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 369,
+            "ev": {
+                "player": -0.0019308161832165844,
+                "banker": 0.0005825457786361298,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:20:01.736Z",
+            "type": "HAND_COMPLETE",
+            "table": "PrettyMG02",
+            "round": 12,
+            "winner": "B",
+            "playerCards": [
+                "7C",
+                "6S",
+                "7S"
+            ],
+            "bankerCards": [
+                "7C",
+                "10S"
+            ],
+            "cardsSubtracted": 5,
+            "deckRemaining": 377,
+            "ev": {
+                "player": -0.0012185397840368834,
+                "banker": -0.00011192371056407274,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:20:00.751Z",
+            "type": "HAND_COMPLETE",
+            "table": "PrettyMG10",
+            "round": 47,
+            "winner": "T",
+            "playerCards": [
+                "8C",
+                "QS"
+            ],
+            "bankerCards": [
+                "9C",
+                "9H"
+            ],
+            "cardsSubtracted": 4,
+            "deckRemaining": 371,
+            "ev": {
+                "player": -0.0017089698297870059,
+                "banker": 0.00036624558404228444,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:20:00.751Z",
+            "type": "HAND_COMPLETE",
+            "table": "PrettyMG01",
+            "round": 54,
+            "winner": "B",
+            "playerCards": [
+                "QS",
+                "4H"
+            ],
+            "bankerCards": [
+                "3C",
+                "5D"
+            ],
+            "cardsSubtracted": 4,
+            "deckRemaining": 369,
+            "ev": {
+                "player": -0.0019879343855853677,
+                "banker": 0.0006382360259457077,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:20:00.751Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyMG05",
+            "round": 50,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 374,
+            "ev": {
+                "player": -0.000516315801724199,
+                "banker": -0.0007965920933189537,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:59.730Z",
+            "type": "HAND_COMPLETE",
+            "table": "Prettyonsexy01",
+            "round": 10,
+            "winner": "B",
+            "playerCards": [
+                "QH",
+                "8H"
+            ],
+            "bankerCards": [
+                "6H",
+                "3D"
+            ],
+            "cardsSubtracted": 4,
+            "deckRemaining": 377,
+            "ev": {
+                "player": -0.0012530756007072333,
+                "banker": -0.00007825128931048843,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:58.720Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyMG07",
+            "round": 35,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 368,
+            "ev": {
+                "player": -0.0014221798638586018,
+                "banker": 0.00008662536726214247,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:57.729Z",
+            "type": "HAND_COMPLETE",
+            "table": "PrettyMG12",
+            "round": 68,
+            "winner": "P",
+            "playerCards": [
+                "8H",
+                "9H"
+            ],
+            "bankerCards": [
+                "9H",
+                "7D"
+            ],
+            "cardsSubtracted": 4,
+            "deckRemaining": 388,
+            "ev": {
+                "player": -0.0020638416910535723,
+                "banker": 0.0007122456487771989,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:57.728Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyMG08",
+            "round": 40,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 371,
+            "ev": {
+                "player": -0.0016122229124334603,
+                "banker": 0.0002719173396226217,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:55.716Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyXPG93",
+            "round": 71,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 367,
+            "ev": {
+                "player": -0.0017831112076477206,
+                "banker": 0.0004385334274565264,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:55.716Z",
+            "type": "HAND_COMPLETE",
+            "table": "Prettyonsexy04",
+            "round": 4,
+            "winner": "B",
+            "playerCards": [
+                "AH",
+                "3D",
+                "2H"
+            ],
+            "bankerCards": [
+                "4D",
+                "JS",
+                "4S"
+            ],
+            "cardsSubtracted": 6,
+            "deckRemaining": 406,
+            "ev": {
+                "player": -0.00204561183005679,
+                "banker": 0.0006944715343053607,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:54.711Z",
+            "type": "STATE_CHANGE",
+            "table": "Prettyonsexy03",
+            "round": 8,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 391,
+            "ev": {
+                "player": -0.0019750442325106466,
+                "banker": 0.0006256681266978599,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:54.711Z",
+            "type": "STATE_CHANGE",
+            "table": "Prettyonsexy02",
+            "round": 51,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 379,
+            "ev": {
+                "player": -0.0015483974630361198,
+                "banker": 0.0002096875264601828,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:52.703Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyMG01",
+            "round": 54,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 373,
+            "ev": {
+                "player": -0.0018554300691485583,
+                "banker": 0.0005090443174198354,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:51.704Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyMG10",
+            "round": 47,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 375,
+            "ev": {
+                "player": -0.001807765714795075,
+                "banker": 0.0004625715719251706,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:51.704Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyMG09",
+            "round": 52,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 378,
+            "ev": {
+                "player": -0.0021558465637275,
+                "banker": 0.0008019503996342901,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:49.688Z",
+            "type": "STATE_CHANGE",
+            "table": "Prettyico116",
+            "round": 55,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 371,
+            "ev": {
+                "player": -0.0011074321805073107,
+                "banker": -0.0002202536240053718,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:48.691Z",
+            "type": "HAND_COMPLETE",
+            "table": "PrettyXPG93",
+            "round": 70,
+            "winner": "B",
+            "playerCards": [
+                "5S",
+                "KC"
+            ],
+            "bankerCards": [
+                "8S",
+                "10C"
+            ],
+            "cardsSubtracted": 4,
+            "deckRemaining": 367,
+            "ev": {
+                "player": -0.0017831112076477206,
+                "banker": 0.0004385334274565264,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:48.691Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyXPG92",
+            "round": 38,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 367,
+            "ev": {
+                "player": -0.000586528801672398,
+                "banker": -0.0007281344183694468,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:48.691Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyMG11",
+            "round": 43,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 371,
+            "ev": {
+                "player": -0.0018140972484022942,
+                "banker": 0.0004687448171921925,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:47.675Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyMG03",
+            "round": 35,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 386,
+            "ev": {
+                "player": -0.0018395270479749024,
+                "banker": 0.000493538871775525,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:46.684Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyMG12",
+            "round": 68,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 392,
+            "ev": {
+                "player": -0.002250197989084657,
+                "banker": 0.0008939430393574872,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:45.686Z",
+            "type": "HAND_COMPLETE",
+            "table": "Prettyonsexy02",
+            "round": 50,
+            "winner": "P",
+            "playerCards": [
+                "6D",
+                "KS"
+            ],
+            "bankerCards": [
+                "8S",
+                "7S",
+                "KC"
+            ],
+            "cardsSubtracted": 5,
+            "deckRemaining": 379,
+            "ev": {
+                "player": -0.0015483974630361198,
+                "banker": 0.0002096875264601828,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:45.686Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyMG02",
+            "round": 12,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 382,
+            "ev": {
+                "player": -0.0016402088459950386,
+                "banker": 0.00029920362484514053,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:44.691Z",
+            "type": "HAND_COMPLETE",
+            "table": "PrettyMG11",
+            "round": 42,
+            "winner": "B",
+            "playerCards": [
+                "QD",
+                "AS"
+            ],
+            "bankerCards": [
+                "QH",
+                "8H"
+            ],
+            "cardsSubtracted": 4,
+            "deckRemaining": 371,
+            "ev": {
+                "player": -0.0018140972484022942,
+                "banker": 0.0004687448171921925,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:44.691Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyMG06",
+            "round": 49,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 369,
+            "ev": {
+                "player": -0.00015448573121739674,
+                "banker": -0.0011493764120630787,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:44.691Z",
+            "type": "HAND_COMPLETE",
+            "table": "Prettyico116",
+            "round": 54,
+            "winner": "P",
+            "playerCards": [
+                "8C",
+                "KD"
+            ],
+            "bankerCards": [
+                "4D",
+                "6C"
+            ],
+            "cardsSubtracted": 4,
+            "deckRemaining": 371,
+            "ev": {
+                "player": -0.0011074321805073107,
+                "banker": -0.0002202536240053718,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:43.665Z",
+            "type": "HAND_COMPLETE",
+            "table": "PrettyMG03",
+            "round": 34,
+            "winner": "B",
+            "playerCards": [
+                "KC",
+                "5S",
+                "KH"
+            ],
+            "bankerCards": [
+                "10H",
+                "10H",
+                "8S"
+            ],
+            "cardsSubtracted": 6,
+            "deckRemaining": 386,
+            "ev": {
+                "player": -0.0018395270479749024,
+                "banker": 0.000493538871775525,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:40.676Z",
+            "type": "STATE_CHANGE",
+            "table": "Prettyonsexy01",
+            "round": 10,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 381,
+            "ev": {
+                "player": -0.0013567487301083918,
+                "banker": 0.000022830011855634255,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:40.676Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyMG04",
+            "round": 46,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 369,
+            "ev": {
+                "player": -0.0019308161832165844,
+                "banker": 0.0005825457786361298,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:39.666Z",
+            "type": "HAND_COMPLETE",
+            "table": "PrettyMG06",
+            "round": 48,
+            "winner": "B",
+            "playerCards": [
+                "3H",
+                "10H",
+                "AH"
+            ],
+            "bankerCards": [
+                "6C",
+                "7C",
+                "6D"
+            ],
+            "cardsSubtracted": 6,
+            "deckRemaining": 369,
+            "ev": {
+                "player": -0.00015448573121739674,
+                "banker": -0.0011493764120630787,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:38.663Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyXPG92",
+            "round": 38,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 367,
+            "ev": {
+                "player": -0.000586528801672398,
+                "banker": -0.0007281344183694468,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:38.663Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyMG05",
+            "round": 50,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 374,
+            "ev": {
+                "player": -0.000516315801724199,
+                "banker": -0.0007965920933189537,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:36.698Z",
+            "type": "HAND_COMPLETE",
+            "table": "PrettyXPG92",
+            "round": 37,
+            "winner": "P",
+            "playerCards": [
+                "3S",
+                "6D"
+            ],
+            "bankerCards": [
+                "7D",
+                "8C"
+            ],
+            "cardsSubtracted": 4,
+            "deckRemaining": 367,
+            "ev": {
+                "player": -0.000586528801672398,
+                "banker": -0.0007281344183694468,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:36.698Z",
+            "type": "STATE_CHANGE",
+            "table": "Prettyonsexy03",
+            "round": 8,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 391,
+            "ev": {
+                "player": -0.0019750442325106466,
+                "banker": 0.0006256681266978599,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:36.698Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyMG07",
+            "round": 35,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 368,
+            "ev": {
+                "player": -0.0014221798638586018,
+                "banker": 0.00008662536726214247,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:36.698Z",
+            "type": "STATE_CHANGE",
+            "table": "Prettyico116",
+            "round": 54,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 375,
+            "ev": {
+                "player": -0.0011419040199553941,
+                "banker": -0.0001866435805434937,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:35.649Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyMG08",
+            "round": 40,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 371,
+            "ev": {
+                "player": -0.0016122229124334603,
+                "banker": 0.0002719173396226217,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:35.649Z",
+            "type": "HAND_COMPLETE",
+            "table": "PrettyMG04",
+            "round": 45,
+            "winner": "B",
+            "playerCards": [
+                "10C",
+                "QS",
+                "2S"
+            ],
+            "bankerCards": [
+                "2C",
+                "KS",
+                "5D"
+            ],
+            "cardsSubtracted": 6,
+            "deckRemaining": 369,
+            "ev": {
+                "player": -0.0019308161832165844,
+                "banker": 0.0005825457786361298,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:33.634Z",
+            "type": "HAND_COMPLETE",
+            "table": "PrettyMG05",
+            "round": 49,
+            "winner": "B",
+            "playerCards": [
+                "6D",
+                "8H",
+                "2H"
+            ],
+            "bankerCards": [
+                "2S",
+                "10S",
+                "5S"
+            ],
+            "cardsSubtracted": 6,
+            "deckRemaining": 374,
+            "ev": {
+                "player": -0.000516315801724199,
+                "banker": -0.0007965920933189537,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:31.741Z",
+            "type": "STATE_CHANGE",
+            "table": "Prettyonsexy04",
+            "round": 4,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 412,
+            "ev": {
+                "player": -0.0015664994588060165,
+                "banker": 0.00022733697233583323,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:31.741Z",
+            "type": "HAND_COMPLETE",
+            "table": "Prettyonsexy03",
+            "round": 7,
+            "winner": "B",
+            "playerCards": [
+                "4S",
+                "8S",
+                "9D"
+            ],
+            "bankerCards": [
+                "5C",
+                "5D",
+                "3C"
+            ],
+            "cardsSubtracted": 6,
+            "deckRemaining": 391,
+            "ev": {
+                "player": -0.0019750442325106466,
+                "banker": 0.0006256681266978599,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:31.741Z",
+            "type": "STATE_CHANGE",
+            "table": "Prettyonsexy01",
+            "round": 10,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 381,
+            "ev": {
+                "player": -0.0013567487301083918,
+                "banker": 0.000022830011855634255,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:31.741Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyMG12",
+            "round": 68,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 392,
+            "ev": {
+                "player": -0.002250197989084657,
+                "banker": 0.0008939430393574872,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:31.741Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyMG11",
+            "round": 42,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 375,
+            "ev": {
+                "player": -0.0017737482987215687,
+                "banker": 0.000429404591253537,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:31.741Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyMG10",
+            "round": 47,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 375,
+            "ev": {
+                "player": -0.001807765714795075,
+                "banker": 0.0004625715719251706,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:31.741Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyMG09",
+            "round": 52,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 378,
+            "ev": {
+                "player": -0.0021558465637275,
+                "banker": 0.0008019503996342901,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:31.741Z",
+            "type": "HAND_COMPLETE",
+            "table": "PrettyMG08",
+            "round": 39,
+            "winner": "B",
+            "playerCards": [
+                "4D",
+                "6S",
+                "3H"
+            ],
+            "bankerCards": [
+                "6D",
+                "8C",
+                "2S"
+            ],
+            "cardsSubtracted": 6,
+            "deckRemaining": 371,
+            "ev": {
+                "player": -0.0016122229124334603,
+                "banker": 0.0002719173396226217,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:31.741Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyMG01",
+            "round": 54,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 373,
+            "ev": {
+                "player": -0.0018554300691485583,
+                "banker": 0.0005090443174198354,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:31.741Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyMG02",
+            "round": 12,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 382,
+            "ev": {
+                "player": -0.0016402088459950386,
+                "banker": 0.00029920362484514053,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:31.741Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyMG03",
+            "round": 34,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 392,
+            "ev": {
+                "player": -0.0019158232783889183,
+                "banker": 0.000567927696429148,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:31.741Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyMG04",
+            "round": 45,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 375,
+            "ev": {
+                "player": -0.0018374891135027258,
+                "banker": 0.0004915518856651556,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:31.741Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyMG06",
+            "round": 48,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 375,
+            "ev": {
+                "player": -0.00042138841991057503,
+                "banker": -0.0008891462905872404,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:31.741Z",
+            "type": "HAND_COMPLETE",
+            "table": "PrettyMG07",
+            "round": 34,
+            "winner": "T",
+            "playerCards": [
+                "8S",
+                "3H",
+                "6D"
+            ],
+            "bankerCards": [
+                "KC",
+                "7D"
+            ],
+            "cardsSubtracted": 5,
+            "deckRemaining": 368,
+            "ev": {
+                "player": -0.0014221798638586018,
+                "banker": 0.00008662536726214247,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:31.741Z",
+            "type": "STATE_CHANGE",
+            "table": "Prettyico116",
+            "round": 54,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 375,
+            "ev": {
+                "player": -0.0011419040199553941,
+                "banker": -0.0001866435805434937,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:16.184Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyMG01",
+            "round": 53,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 373,
+            "ev": {
+                "player": -0.0018554300691485583,
+                "banker": 0.0005090443174198354,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:16.184Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyMG05",
+            "round": 49,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 380,
+            "ev": {
+                "player": -0.0006785518486253812,
+                "banker": -0.0006384119475902617,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:15.168Z",
+            "type": "HAND_COMPLETE",
+            "table": "Prettyonsexy01",
+            "round": 9,
+            "winner": null,
+            "playerCards": [
+                "4H",
+                "4D"
+            ],
+            "bankerCards": [
+                "10H",
+                "AH"
+            ],
+            "cardsSubtracted": 4,
+            "deckRemaining": 381,
+            "ev": {
+                "player": -0.0013567487301083918,
+                "banker": 0.000022830011855634255,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:14.172Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyMG10",
+            "round": 46,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 375,
+            "ev": {
+                "player": -0.001807765714795075,
+                "banker": 0.0004625715719251706,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:14.172Z",
+            "type": "HAND_COMPLETE",
+            "table": "Prettyico116",
+            "round": 53,
+            "winner": null,
+            "playerCards": [
+                "7H",
+                "10C"
+            ],
+            "bankerCards": [
+                "7D",
+                "KH"
+            ],
+            "cardsSubtracted": 4,
+            "deckRemaining": 375,
+            "ev": {
+                "player": -0.0011419040199553941,
+                "banker": -0.0001866435805434937,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:13.158Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyXPG92",
+            "round": 37,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 371,
+            "ev": {
+                "player": -0.0008263341917680456,
+                "banker": -0.0004943241630261906,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:12.153Z",
+            "type": "STATE_CHANGE",
+            "table": "Prettyonsexy02",
+            "round": 50,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 384,
+            "ev": {
+                "player": -0.0018090194894393105,
+                "banker": 0.00046379400220333475,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:10.155Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyMG08",
+            "round": 39,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 377,
+            "ev": {
+                "player": -0.0016477102824940162,
+                "banker": 0.0003065175254316158,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:09.150Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyMG11",
+            "round": 42,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 375,
+            "ev": {
+                "player": -0.0017737482987215687,
+                "banker": 0.000429404591253537,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:06.143Z",
+            "type": "STATE_CHANGE",
+            "table": "Prettyico116",
+            "round": 53,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 379,
+            "ev": {
+                "player": -0.0013137037010350818,
+                "banker": -0.000019138891490822277,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:05.134Z",
+            "type": "HAND_COMPLETE",
+            "table": "PrettyMG11",
+            "round": 41,
+            "winner": null,
+            "playerCards": [
+                "3C",
+                "4C"
+            ],
+            "bankerCards": [
+                "2H",
+                "10D",
+                "AC"
+            ],
+            "cardsSubtracted": 5,
+            "deckRemaining": 375,
+            "ev": {
+                "player": -0.0017737482987215687,
+                "banker": 0.000429404591253537,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:04.129Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyMG02",
+            "round": 11,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 382,
+            "ev": {
+                "player": -0.0016402088459950386,
+                "banker": 0.00029920362484514053,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:03.137Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyXPG92",
+            "round": 37,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 371,
+            "ev": {
+                "player": -0.0008263341917680456,
+                "banker": -0.0004943241630261906,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:03.137Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyMG03",
+            "round": 34,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 392,
+            "ev": {
+                "player": -0.0019158232783889183,
+                "banker": 0.000567927696429148,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:19:01.123Z",
+            "type": "STATE_CHANGE",
+            "table": "Prettyonsexy04",
+            "round": 4,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 412,
+            "ev": {
+                "player": -0.0015664994588060165,
+                "banker": 0.00022733697233583323,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:18:59.113Z",
+            "type": "STATE_CHANGE",
+            "table": "Prettyonsexy03",
+            "round": 7,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 397,
+            "ev": {
+                "player": -0.0020404825220980954,
+                "banker": 0.0006894704590456099,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:18:58.152Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyXPG93",
+            "round": 69,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 371,
+            "ev": {
+                "player": -0.0019057953636752705,
+                "banker": 0.0005581504795833959,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:18:58.152Z",
+            "type": "STATE_CHANGE",
+            "table": "Prettyonsexy01",
+            "round": 9,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 385,
+            "ev": {
+                "player": -0.0010370636541849835,
+                "banker": -0.00028886293716968645,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:18:58.152Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyMG12",
+            "round": 67,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 392,
+            "ev": {
+                "player": -0.002250197989084657,
+                "banker": 0.0008939430393574872,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:18:58.152Z",
+            "type": "HAND_COMPLETE",
+            "table": "PrettyMG03",
+            "round": 33,
+            "winner": null,
+            "playerCards": [
+                "KS",
+                "QC",
+                "8C"
+            ],
+            "bankerCards": [
+                "KS",
+                "10S",
+                "4C"
+            ],
+            "cardsSubtracted": 6,
+            "deckRemaining": 392,
+            "ev": {
+                "player": -0.0019158232783889183,
+                "banker": 0.000567927696429148,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:18:58.152Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyMG06",
+            "round": 48,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 375,
+            "ev": {
+                "player": -0.00042138841991057503,
+                "banker": -0.0008891462905872404,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:18:57.098Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyMG09",
+            "round": 51,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 378,
+            "ev": {
+                "player": -0.0021558465637275,
+                "banker": 0.0008019503996342901,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:18:55.115Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyMG01",
+            "round": 53,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 373,
+            "ev": {
+                "player": -0.0018554300691485583,
+                "banker": 0.0005090443174198354,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:18:55.115Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyMG04",
+            "round": 45,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 375,
+            "ev": {
+                "player": -0.0018374891135027258,
+                "banker": 0.0004915518856651556,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:18:55.115Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyMG07",
+            "round": 34,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 373,
+            "ev": {
+                "player": -0.0016250883413172108,
+                "banker": 0.00028446113278426076,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:18:54.100Z",
+            "type": "STATE_CHANGE",
+            "table": "Prettyonsexy02",
+            "round": 50,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 384,
+            "ev": {
+                "player": -0.0018090194894393105,
+                "banker": 0.00046379400220333475,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:18:54.100Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyMG05",
+            "round": 49,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 380,
+            "ev": {
+                "player": -0.0006785518486253812,
+                "banker": -0.0006384119475902617,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:18:53.086Z",
+            "type": "HAND_COMPLETE",
+            "table": "PrettyMG06",
+            "round": 47,
+            "winner": null,
+            "playerCards": [
+                "5H",
+                "10S",
+                "10D"
+            ],
+            "bankerCards": [
+                "5S",
+                "7C",
+                "AC"
+            ],
+            "cardsSubtracted": 6,
+            "deckRemaining": 375,
+            "ev": {
+                "player": -0.00042138841991057503,
+                "banker": -0.0008891462905872404,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:18:52.088Z",
+            "type": "HAND_COMPLETE",
+            "table": "PrettyXPG92",
+            "round": 36,
+            "winner": null,
+            "playerCards": [
+                "5S",
+                "JS",
+                "6S"
+            ],
+            "bankerCards": [
+                "KH",
+                "7C"
+            ],
+            "cardsSubtracted": 5,
+            "deckRemaining": 371,
+            "ev": {
+                "player": -0.0008263341917680456,
+                "banker": -0.0004943241630261906,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:18:52.088Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyMG10",
+            "round": 46,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 375,
+            "ev": {
+                "player": -0.001807765714795075,
+                "banker": 0.0004625715719251706,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:18:51.078Z",
+            "type": "STATE_CHANGE",
+            "table": "PrettyMG11",
+            "round": 41,
+            "winner": null,
+            "playerCards": [],
+            "bankerCards": [],
+            "cardsSubtracted": 0,
+            "deckRemaining": 380,
+            "ev": {
+                "player": -0.0014106738094110099,
+                "banker": 0.00007540696417572025,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:18:50.095Z",
+            "type": "HAND_COMPLETE",
+            "table": "Prettyonsexy04",
+            "round": 3,
+            "winner": null,
+            "playerCards": [
+                "JC",
+                "9C"
+            ],
+            "bankerCards": [
+                "AD",
+                "6S"
+            ],
+            "cardsSubtracted": 4,
+            "deckRemaining": 412,
+            "ev": {
+                "player": -0.0015664994588060165,
+                "banker": 0.00022733697233583323,
+                "best": null
+            }
+        },
+        {
+            "time": "2026-05-25T05:18:50.095Z",
+            "type": "HAND_COMPLETE",
+            "table": "PrettyMG01",
+            "round": 52,
+            "winner": null,
+            "playerCards": [
+                "5H",
+                "4D"
+            ],
+            "bankerCards": [
+                "9H",
+                "8D"
+            ],
+            "cardsSubtracted": 4,
+            "deckRemaining": 373,
+            "ev": {
+                "player": -0.0018554300691485583,
+                "banker": 0.0005090443174198354,
+                "best": null
+            }
+        }
+    ]
+}

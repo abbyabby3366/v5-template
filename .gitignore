@@ -1,0 +1,21 @@
+node_modules/
+
+# Rust build artifacts
+baccarat_analyzer_v3/target/
+
+# Runtime-generated files
+scrape_log.txt
+
+# Runtime JSON state (auto-generated, not config)
+eyes/json/eyes_state.json
+eyes/json/tables_state.json
+utils/login_timestamps.json
+
+# Account configs (contain credentials — use .example.json as template)
+bet_module/json/bet_accounts.json
+eyes/json/eyes_accounts.json
+
+# Environment (contains local config)
+.env
+
+dashboard/config.json
