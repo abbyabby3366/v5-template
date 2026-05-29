@@ -23,6 +23,7 @@ const {
   checkIsAlreadyFinalized,
   cardRankToIndex,
   processAndValidateCards,
+  checkSpecificCardDepletion,
 } = require("./stateValidators");
 
 // ─── Fresh 8-Deck Shoe ──────────────────────────────────────────────────
@@ -196,18 +197,24 @@ class TableStateManager {
             newRound
           );
 
+          let finalCorruptedReason = corruptedReason;
+
+          if (!finalCorruptedReason) {
+            finalCorruptedReason = checkSpecificCardDepletion(ts.handHistory, table.playerCards, table.bankerCards);
+          }
+
           ts.deckComposition = newComposition;
           ts.consecutiveZeroCardHands = nextConsecutiveZeroCardHands;
           ts.handNumber++;
           ts.lastFinalizedRound = newRound;
           ts.lastWarnedMissedRound = null; // Reset warning state since we successfully completed a round
 
-          if (corruptedReason) {
-            this.#resetShoe(ts, corruptedReason);
+          if (finalCorruptedReason) {
+            this.#resetShoe(ts, finalCorruptedReason);
             events.push({
               type: "SHOE_RESET",
               tableName: name,
-              reason: corruptedReason,
+              reason: finalCorruptedReason,
               finalRound: ts.round
             });
           } else {

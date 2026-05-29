@@ -9,17 +9,12 @@
  * @returns {string|null} Reset reason, or null if valid
  */
 function checkEventValidations(ts, newRound, newState, prevState) {
-  // 1. Validate restored state round drop
-  if (ts.restored && newRound < ts.round) {
-    return `Stale state: round went from ${ts.round} → ${newRound} after restore`;
-  }
-
-  // 2. Recorded hands significantly ahead of UI round
+  // 1. Recorded hands significantly ahead of UI round
   if (ts.handNumber >= newRound + 3 && newRound > 0) {
     return `Invalid state: recorded hands (${ts.handNumber}) >= table round + 3 (${newRound + 3})`;
   }
 
-  // 3. Mathematically invalid deck size or hard limit <= 16
+  // 2. Mathematically invalid deck size or hard limit <= 16
   const effectiveRound = Math.max(newRound, ts.handNumber);
   const minExpectedCards = 416 - ((effectiveRound + 1) * 6);
   const adjustedMinCards = Math.max(0, minExpectedCards);
@@ -28,7 +23,7 @@ function checkEventValidations(ts, newRound, newState, prevState) {
     return `Invalid state: cards left (${ts.remaining}) critically low (<= 16) or < expected min (${adjustedMinCards}) for round ${newRound}`;
   }
 
-  // 4. Hard Limit on Round Number (Mathematically improbable)
+  // 3. Hard Limit on Round Number (Mathematically improbable)
   if (newRound > 90 && newState !== "Shuffling") {
     return `Invalid state: round number (${newRound}) mathematically exceeds standard 8-deck shoe (> 90)`;
   }
@@ -273,6 +268,65 @@ function processAndValidateCards(currentComposition, playerCards, bankerCards, c
   };
 }
 
+/**
+ * Normalizes card names (e.g. converting '10S' to 'TS') for consistent key lookup.
+ * @param {string} card 
+ * @returns {string}
+ */
+function normalizeCardName(card) {
+  if (!card) return "";
+  let u = card.toUpperCase();
+  if (u.startsWith("10")) {
+    u = "T" + u.slice(2);
+  }
+  return u;
+}
+
+/**
+ * Validates that no single card (rank + suit) appears more than 8 times in the shoe history.
+ * @param {Array} handHistory - The completed hands history for the current shoe
+ * @param {string[]} playerCards - Current hand's player cards
+ * @param {string[]} bankerCards - Current hand's banker cards
+ * @returns {string|null} Error reason if limit (> 8) is exceeded, or null if valid.
+ */
+function checkSpecificCardDepletion(handHistory, playerCards, bankerCards) {
+  const cardCounts = {};
+
+  const addAndVerify = (card) => {
+    if (!card) return null;
+    const normalized = normalizeCardName(card);
+    if (!normalized) return null;
+
+    cardCounts[normalized] = (cardCounts[normalized] || 0) + 1;
+    if (cardCounts[normalized] > 8) {
+      return `Invalid state: card ${normalized} appeared ${cardCounts[normalized]} times (exceeds 8-deck limit)`;
+    }
+    return null;
+  };
+
+  // 1. Process all cards from previous hands in the current shoe
+  if (handHistory) {
+    for (const hand of handHistory) {
+      if (hand) {
+        const allHandCards = [...(hand.playerCards || []), ...(hand.bankerCards || [])];
+        for (const card of allHandCards) {
+          const err = addAndVerify(card);
+          if (err) return err;
+        }
+      }
+    }
+  }
+
+  // 2. Process current hand cards
+  const currentHandCards = [...(playerCards || []), ...(bankerCards || [])];
+  for (const card of currentHandCards) {
+    const err = addAndVerify(card);
+    if (err) return err;
+  }
+
+  return null;
+}
+
 module.exports = {
   checkEventValidations,
   checkShoeResetNeeded,
@@ -289,4 +343,6 @@ module.exports = {
   checkIsAlreadyFinalized,
   cardRankToIndex,
   processAndValidateCards,
+  normalizeCardName,
+  checkSpecificCardDepletion,
 };
