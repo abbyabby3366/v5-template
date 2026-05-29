@@ -74,7 +74,7 @@ async function runEventBasedEyes(pageRef, extractorCode, acctConfig) {
 
         // Dashboard snapshot
         const allTables = Array.from(latestScrapedTables.values());
-        writeDashboardJson(allTables, stateManager, timestamp, [], Array.from(latestScrapedTables.keys()), ignoredTables, dynamicConfig, eventLog);
+        await writeDashboardJson(allTables, stateManager, timestamp, [], Array.from(latestScrapedTables.keys()), ignoredTables, dynamicConfig, eventLog);
 
       } while (runAgain);
 

@@ -17,32 +17,13 @@ const {
   checkCardCount,
   checkBeadRoadMismatch,
   isInvalidStateReset,
+  checkStaleRestoredState,
+  checkImplicitOrExplicitNewShoe,
+  checkMissedRounds,
+  checkIsAlreadyFinalized,
+  cardRankToIndex,
+  processAndValidateCards,
 } = require("./stateValidators");
-
-// ─── Card Name → 13-slot Rank Index ─────────────────────────────────────
-// Index: 0=A, 1=2, 2=3, 3=4, 4=5, 5=6, 6=7, 7=8, 8=9, 9=T, 10=J, 11=Q, 12=K
-function cardRankToIndex(cardName) {
-  if (!cardName) return -1;
-  const rank = cardName.slice(0, -1).toUpperCase();
-
-  switch (rank) {
-    case "A":  return 0;
-    case "2":  return 1;
-    case "3":  return 2;
-    case "4":  return 3;
-    case "5":  return 4;
-    case "6":  return 5;
-    case "7":  return 6;
-    case "8":  return 7;
-    case "9":  return 8;
-    case "10":
-    case "T":  return 9;
-    case "J":  return 10;
-    case "Q":  return 11;
-    case "K":  return 12;
-    default:   return -1;
-  }
-}
 
 // ─── Fresh 8-Deck Shoe ──────────────────────────────────────────────────
 // Each rank × 4 suits × 8 decks = 32 cards per rank slot. Total = 416.
@@ -58,7 +39,7 @@ class TableState {
   constructor(tableName, tableId = null) {
     this.tableName = tableName;
     this.tableId = tableId;
-    this.roundId = null;
+    this.shoeId = null;
     this.state = null;
     this.round = 0;
     this.deckComposition = freshShoe();
@@ -73,6 +54,8 @@ class TableState {
     this.lastErrorResetTime = null;
     this.handHistory = [];
     this.lastAlertedMismatchRound = null;
+    this.lastWarnedEvRound = null;
+    this.lastWarnedMissedRound = null;
   }
 
   get remaining() {
@@ -114,55 +97,48 @@ class TableStateManager {
       const prevState = ts.state;
       const newState = table.state;
       const newRound = table.round;
-      const newRoundId = table.roundId || null;
+      const newShoeId = table.shoeId || null;
 
       // Update tableId if provided
       if (table.tableId) ts.tableId = table.tableId;
 
-      // 1. Handle stale restored state
-      if (ts.restored) {
-        ts.restored = false;
-        const roundIdMismatch = ts.roundId && newRoundId && ts.roundId !== newRoundId;
-        const roundDrop = newRound < ts.round;
-        if (roundDrop || roundIdMismatch) {
-          const reason = `Invalid state: Stale state restored (saved R${ts.round}/ID ${ts.roundId || "N/A"} -> live R${newRound}/ID ${newRoundId || "N/A"})`;
-          this.#resetShoe(ts, reason);
-          events.push({
-            type: "SHOE_RESET",
-            tableName: name,
-            reason: reason,
-            finalRound: ts.round
-          });
-          ts.state = newState;
-          ts.round = newRound;
-          if (newRoundId) ts.roundId = newRoundId;
-          continue;
-        } else {
-          console.log(`\x1b[36m[STATE] ${name}: Validated restored state (saved R${ts.round} → live R${newRound})\x1b[0m`);
-        }
+      // Initialize shoeId if not set
+      if (!ts.shoeId && newShoeId) {
+        ts.shoeId = newShoeId;
       }
 
-      // 2. Detect implicit or explicit new shoe
-      const significantRoundDrop = newRound < ts.round - 1 && ts.round > 1;
-      const shoeChangedByRound = newRound === 1 && ts.round > 1;
-      const shoeChangedByRoundId = newRoundId && ts.roundId && newRoundId !== ts.roundId && newRound <= 1;
+      // 1. Handle stale restored state
+      const staleReason = checkStaleRestoredState(ts, newRound);
+      if (ts.restored) ts.restored = false;
 
-      const { forceReset, resetReason } = checkShoeResetNeeded(ts, newRound, newState, table.statistics);
-      const isImplicitShuffle = significantRoundDrop || shoeChangedByRound || shoeChangedByRoundId;
-
-      if (forceReset || isImplicitShuffle || (newState === "Shuffling" && prevState !== "Shuffling")) {
-        const reason = resetReason || (newState === "Shuffling" ? "Shuffling state detected" : `Implicit shoe change detected (R${ts.round} -> R${newRound})`);
-        this.#resetShoe(ts, reason);
+      if (staleReason) {
+        this.#resetShoe(ts, staleReason);
         events.push({
           type: "SHOE_RESET",
           tableName: name,
-          reason: reason,
+          reason: staleReason,
+          finalRound: ts.round
+        });
+        ts.state = newState;
+        ts.round = newRound;
+        if (newShoeId) ts.shoeId = newShoeId;
+        continue;
+      }
+
+      // 2. Detect implicit or explicit new shoe
+      const newShoeReason = checkImplicitOrExplicitNewShoe(ts, newRound, newState, prevState, newShoeId, table.statistics);
+      if (newShoeReason) {
+        this.#resetShoe(ts, newShoeReason);
+        events.push({
+          type: "SHOE_RESET",
+          tableName: name,
+          reason: newShoeReason,
           isActualShuffle: true,
           finalRound: ts.round
         });
         ts.state = newState;
         ts.round = newRound;
-        if (newRoundId) ts.roundId = newRoundId;
+        if (newShoeId) ts.shoeId = newShoeId;
         ts.handHistory = [];
         continue;
       }
@@ -173,8 +149,10 @@ class TableStateManager {
         continue;
       }
 
-      // Update roundId tracking
-      if (newRoundId) ts.roundId = newRoundId;
+      // Track shoeId (keep constant, set only if null)
+      if (!ts.shoeId && newShoeId) {
+        ts.shoeId = newShoeId;
+      }
 
       // Verify hand history outcomes match server statistics
       const { mismatchFound, mismatchDetails, mismatchRound } = checkBeadRoadMismatch(ts.handHistory, table.statistics);
@@ -186,12 +164,15 @@ class TableStateManager {
       }
 
       // 4. Missed Round (Gap) Detection
-      if (ts.lastFinalizedRound > 0 && newRound > ts.lastFinalizedRound + 1) {
-        console.warn(`\x1b[33m[STATE] ${name}: Missed round(s) detected between last finalized R${ts.lastFinalizedRound} and live R${newRound}. Continuing as requested...\x1b[0m`);
+      if (checkMissedRounds(ts, newRound)) {
+        if (ts.lastWarnedMissedRound !== newRound) {
+          console.warn(`\x1b[33m[STATE] ${name}: Missed round(s) detected between last finalized R${ts.lastFinalizedRound} and live R${newRound}. Continuing as requested...\x1b[0m`);
+          ts.lastWarnedMissedRound = newRound;
+        }
       }
 
       // Process hand completion when server transitions to Result
-      const isAlreadyFinalized = ts.handHistory?.some(item => item && item.round === newRound);
+      const isAlreadyFinalized = checkIsAlreadyFinalized(ts, newRound);
       const hasCards = (table.playerCards?.length > 0) || (table.bankerCards?.length > 0);
 
       if (isResultState(newState) && newRound > ts.lastFinalizedRound && newRound > 0 && hasCards) {
@@ -201,41 +182,25 @@ class TableStateManager {
             `[WARNING] ${ts.tableName}: Double-deduction attempt guarded for completed round ${newRound}!`
           );
         } else {
-          // Extract cards and subtract them from deck composition
-          let cardsSubtracted = 0;
-          let corruptedReason = null;
-          const allCards = [...table.playerCards, ...table.bankerCards];
+          // Extract, validate, and subtract cards via stateValidators
+          const {
+            corruptedReason,
+            cardsSubtracted,
+            newComposition,
+            nextConsecutiveZeroCardHands
+          } = processAndValidateCards(
+            ts.deckComposition,
+            table.playerCards,
+            table.bankerCards,
+            ts.consecutiveZeroCardHands,
+            newRound
+          );
 
-          for (const card of allCards) {
-            const idx = cardRankToIndex(card);
-            if (idx >= 0) {
-              const impReason = checkImpossibleCard(ts.deckComposition, idx, card);
-              if (impReason && !corruptedReason) {
-                corruptedReason = impReason;
-              }
-              if (ts.deckComposition[idx] > 0) {
-                ts.deckComposition[idx]--;
-              }
-              cardsSubtracted++;
-            }
-          }
-
-          if (cardsSubtracted === 0) {
-            ts.consecutiveZeroCardHands++;
-            const ghostReason = checkGhostHands(ts.consecutiveZeroCardHands);
-            if (ghostReason && !corruptedReason) {
-              corruptedReason = ghostReason;
-            }
-          } else {
-            ts.consecutiveZeroCardHands = 0;
-            const countReason = checkCardCount(cardsSubtracted, newRound);
-            if (countReason && !corruptedReason) {
-              corruptedReason = countReason;
-            }
-          }
-
+          ts.deckComposition = newComposition;
+          ts.consecutiveZeroCardHands = nextConsecutiveZeroCardHands;
           ts.handNumber++;
           ts.lastFinalizedRound = newRound;
+          ts.lastWarnedMissedRound = null; // Reset warning state since we successfully completed a round
 
           if (corruptedReason) {
             this.#resetShoe(ts, corruptedReason);
@@ -246,12 +211,15 @@ class TableStateManager {
               finalRound: ts.round
             });
           } else {
+            ts.lastErrorResetReason = null;
+            ts.lastErrorResetTime = null;
             if (table.winner) {
               ts.handHistory.push({
                 round: newRound,
                 winner: table.winner,
                 playerCards: table.playerCards || [],
-                bankerCards: table.bankerCards || []
+                bankerCards: table.bankerCards || [],
+                winPoints: table.winPoints !== undefined && table.winPoints !== null ? table.winPoints : null
               });
             }
 
@@ -332,14 +300,18 @@ class TableStateManager {
       : "";
     const msg = `[SHOE] ${ts.tableName}: Reset to fresh shoe (Reason: ${reason}${roundInfo})`;
 
+    ts.shoeId = null;
     ts.deckComposition = freshShoe();
     ts.handNumber = 0;
     ts.lastFinalizedRound = 0;
     ts.hasWarnedAhead = false;
     ts.consecutiveZeroCardHands = 0;
     ts.lastEvResult = null;
+    ts.currentBetId = null;
     ts.handHistory = [];
     ts.lastAlertedMismatchRound = null;
+    ts.lastWarnedEvRound = null;
+    ts.lastWarnedMissedRound = null;
 
     if (isInvalidStateReset(reason)) {
       ts.lastErrorResetReason = reason;
@@ -362,7 +334,7 @@ class TableStateManager {
       data[name] = {
         tableName: ts.tableName,
         tableId: ts.tableId,
-        roundId: ts.roundId,
+        shoeId: ts.shoeId,
         state: ts.state,
         round: ts.round,
         deckComposition: ts.deckComposition,
@@ -376,6 +348,8 @@ class TableStateManager {
         handHistory: ts.handHistory,
         hasWarnedAhead: ts.hasWarnedAhead,
         lastAlertedMismatchRound: ts.lastAlertedMismatchRound,
+        lastWarnedEvRound: ts.lastWarnedEvRound,
+        lastWarnedMissedRound: ts.lastWarnedMissedRound,
       };
     }
     return data;
@@ -391,12 +365,12 @@ class TableStateManager {
 
     for (const [name, saved] of Object.entries(data)) {
       const ts = new TableState(name, saved.tableId || null);
-      ts.roundId = saved.roundId || null;
-      ts.state = saved.state || saved.lastState || null;
-      ts.round = saved.round || saved.lastRound || 0;
+      ts.shoeId = saved.shoeId || null;
+      ts.state = saved.state || null;
+      ts.round = saved.round || 0;
       ts.deckComposition = saved.deckComposition || freshShoe();
       ts.handNumber = saved.handNumber || 0;
-      ts.lastFinalizedRound = saved.lastFinalizedRound || saved.round || saved.lastRound || 0;
+      ts.lastFinalizedRound = saved.lastFinalizedRound || saved.round || 0;
       ts.lastEvResult = saved.lastEvResult || null;
       ts.currentBetId = saved.currentBetId || null;
       ts.consecutiveZeroCardHands = saved.consecutiveZeroCardHands || 0;
@@ -404,6 +378,8 @@ class TableStateManager {
       ts.lastErrorResetTime = saved.lastErrorResetTime || null;
       ts.hasWarnedAhead = saved.hasWarnedAhead || false;
       ts.lastAlertedMismatchRound = saved.lastAlertedMismatchRound || null;
+      ts.lastWarnedEvRound = saved.lastWarnedEvRound || null;
+      ts.lastWarnedMissedRound = saved.lastWarnedMissedRound || null;
 
       // Support restoring from old format (deducedBeadRoad) or new (handHistory)
       const rawHistory = saved.handHistory || saved.deducedBeadRoad || [];

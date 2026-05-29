@@ -7,8 +7,8 @@
 
 const fs = require("fs");
 const path = require("path");
-const { checkPageErrors } = require("../utils/check_page_interval");
 const { sendWhatsAppNotification } = require("../utils/whatsapp_notifier");
+const { loginToDemo } = require("./demoLogin");
 
 const TS_FILE = path.resolve(__dirname, "..", "utils", "login_timestamps.json");
 
@@ -82,10 +82,7 @@ function setupSessionRestart(browserContext, pageRef, acctConfig, onBeforeSwap) 
     if (isHippoOrDirect && browserContext) {
       console.log(`[Session Restart] Performing SEAMLESS restart for Hippo... Preparing new page in background.`);
       try {
-        const newPage = await browserContext.newPage();
-        await newPage.goto("https://d3jai9eacl1740.cloudfront.net/lobby/multiplay", { waitUntil: "networkidle2", timeout: 30000 }).catch(() => {});
-        
-        await checkPageErrors(newPage, { log: console.log, warn: console.warn, error: console.error });
+        const newPage = await loginToDemo(browserContext);
         console.log(`[Session Restart] New page fully loaded and prepared. Swapping seamlessly!`);
         
         const oldPage = pageRef.current;
@@ -142,4 +139,5 @@ module.exports = {
   setupSessionRestart,
   updateLoginTimestamp,
   getLoginTimestamp,
+  loginToDemo,
 };

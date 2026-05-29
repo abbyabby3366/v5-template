@@ -12,33 +12,28 @@ const STATE_FILE = path.join(STATE_DIR, "eyes_state.json");
 const DASHBOARD_FILE = path.join(STATE_DIR, "tables_state.json");
 
 /**
- * Renames a file using a retry loop and fallback strategy to handle Windows locking (EPERM / EBUSY).
- * If all retries fail, it falls back to a synchronous read/write to overwrite the destination.
+ * Renames a file using a simple copy/delete fallback strategy if Windows file locks (EPERM / EBUSY) prevent standard renaming.
  */
-function safeRenameSync(src, dest, retries = 5, delay = 50) {
-  for (let i = 0; i < retries; i++) {
-    try {
-      fs.renameSync(src, dest);
-      return;
-    } catch (err) {
-      if (err.code === "EPERM" || err.code === "EBUSY") {
-        if (i === retries - 1) {
-          // Last retry failed, perform fallback copy/write operation
+function safeRename(src, dest) {
+  try {
+    fs.renameSync(src, dest);
+  } catch (err) {
+    if (err.code === "EPERM" || err.code === "EBUSY" || err.code === "ENOENT") {
+      try {
+        if (fs.existsSync(src)) {
+          const data = fs.readFileSync(src);
+          fs.writeFileSync(dest, data);
           try {
-            const data = fs.readFileSync(src);
-            fs.writeFileSync(dest, data);
             fs.unlinkSync(src);
-            return;
-          } catch (fallbackErr) {
-            throw new Error(`safeRenameSync fallback failed: ${fallbackErr.message} (original error: ${err.message})`);
+          } catch (unlinkErr) {
+            // Ignore temporary file cleanup failure since the main write succeeded
           }
         }
-        // Synchronous sleep using high-resolution busy loop
-        const start = Date.now();
-        while (Date.now() - start < delay) {}
-      } else {
-        throw err;
+      } catch (fallbackErr) {
+        console.error(`[STATE] safeRename fallback failed: ${fallbackErr.message}`);
       }
+    } else {
+      throw err;
     }
   }
 }
@@ -76,7 +71,7 @@ function loadState(stateManager, eventLog, maxAgeMin = 60) {
 }
 
 /**
- * Save current table state to disk.
+ * Save current table state to disk (synchronous).
  * @param {object} stateManager - TableStateManager instance
  * @param {Array} eventLog - In-memory event log reference
  */
@@ -91,67 +86,50 @@ function saveState(stateManager, eventLog) {
         eventLog: eventLog,
       })
     );
-    safeRenameSync(tmpFile, STATE_FILE);
+    safeRename(tmpFile, STATE_FILE);
   } catch (e) {
     // Silent fail
   }
 }
 
-function mapTableToSnapshot(table, stateManager) {
-  const ts = stateManager.getTable(table.tableName);
-  const lastHand = ts ? ts.lastHand : null;
-  return {
-    tableName: table.tableName,
-    tableId: ts ? ts.tableId : null,
-    roundId: ts ? ts.roundId : null,
-    state: table.state,
-    timer: table.timer,
-    round: table.round,
-    wins: table.wins,
-    previousState: ts ? ts.state : null,
-    handNumber: ts ? ts.handNumber : 0,
-    deckRemaining: ts ? ts.remaining : 416,
-    deckComposition: ts ? ts.deckComposition : null,
-    deckLabelled: ts ? {
-      A: ts.deckComposition[0],
-      "2": ts.deckComposition[1],
-      "3": ts.deckComposition[2],
-      "4": ts.deckComposition[3],
-      "5": ts.deckComposition[4],
-      "6": ts.deckComposition[5],
-      "7": ts.deckComposition[6],
-      "8": ts.deckComposition[7],
-      "9": ts.deckComposition[8],
-      T: ts.deckComposition[9],
-      J: ts.deckComposition[10],
-      Q: ts.deckComposition[11],
-      K: ts.deckComposition[12],
-    } : null,
-    lastPlayerCards: ts && ts.lastHand ? ts.lastHand.playerCards : [],
-    lastBankerCards: ts && ts.lastHand ? ts.lastHand.bankerCards : [],
-    lastErrorResetReason: ts ? ts.lastErrorResetReason : null,
-    lastErrorResetTime: ts ? ts.lastErrorResetTime : null,
-    deducedBeadRoad: ts ? ts.handHistory : [],
-    sourceBeadRoad: table.statistics || [],
-    ev: ts && ts.lastEvResult ? {
-      player: { ev: ts.lastEvResult.ev_player, evBase: ts.lastEvResult.ev_player_base, prob: ts.lastEvResult.p_player },
-      banker: { ev: ts.lastEvResult.ev_banker, evBase: ts.lastEvResult.ev_banker_base, prob: ts.lastEvResult.p_banker },
-      tie: { ev: ts.lastEvResult.ev_tie, prob: ts.lastEvResult.p_tie },
-      rebate: ts.lastEvResult.rebate,
-      best: ts.lastEvResult.best,
-    } : null
-  };
-}
-
 /**
  * Writes the tables_state.json for dashboard usage.
  */
-function writeDashboardJson(tables, stateManager, timestamp, events, allScrapedTables = [], ignoredTables = [], dynamicConfig = {}, eventLog = []) {
-  const stateSnapshot = [];
-  
-  for (const table of tables) {
-    stateSnapshot.push(mapTableToSnapshot(table, stateManager));
-  }
+async function writeDashboardJson(tables, stateManager, timestamp, events, allScrapedTables = [], ignoredTables = [], dynamicConfig = {}, eventLog = []) {
+  const stateSnapshot = tables.map((table) => {
+    const ts = stateManager.getTable(table.tableName);
+    const deck = ts?.deckComposition;
+
+    return {
+      tableName: table.tableName,
+      tableId: ts?.tableId ?? null,
+      shoeId: ts?.shoeId ?? null,
+      state: table.state,
+      timer: table.timer,
+      round: table.round,
+      wins: table.wins,
+      previousState: ts?.state ?? null,
+      handNumber: ts?.handNumber ?? null,
+      deckRemaining: ts?.remaining ?? null,
+      deckComposition: deck ?? null,
+      deckLabelled: deck ? Object.fromEntries(
+        ["A", "2", "3", "4", "5", "6", "7", "8", "9", "T", "J", "Q", "K"].map((r, i) => [r, deck[i]])
+      ) : null,
+      lastPlayerCards: ts?.lastHand?.playerCards ?? [],
+      lastBankerCards: ts?.lastHand?.bankerCards ?? [],
+      lastErrorResetReason: ts?.lastErrorResetReason ?? null,
+      lastErrorResetTime: ts?.lastErrorResetTime ?? null,
+      deducedBeadRoad: ts?.handHistory ?? [],
+      sourceBeadRoad: table.statistics ?? [],
+      ev: ts?.lastEvResult ? {
+        player: { ev: ts.lastEvResult.ev_player, evBase: ts.lastEvResult.ev_player_base, prob: ts.lastEvResult.p_player },
+        banker: { ev: ts.lastEvResult.ev_banker, evBase: ts.lastEvResult.ev_banker_base, prob: ts.lastEvResult.p_banker },
+        tie: { ev: ts.lastEvResult.ev_tie, prob: ts.lastEvResult.p_tie },
+        rebate: ts.lastEvResult.rebate,
+        best: ts.lastEvResult.best,
+      } : null
+    };
+  });
 
   const eventsSummary = events.map((e) => ({
     type: e.type,
@@ -183,7 +161,7 @@ function writeDashboardJson(tables, stateManager, timestamp, events, allScrapedT
         2
       )
     );
-    safeRenameSync(tmpFile, DASHBOARD_FILE);
+    safeRename(tmpFile, DASHBOARD_FILE);
   } catch (e) {
     console.error(`[STATE] Failed to write tables_state.json: ${e.message}`);
   }

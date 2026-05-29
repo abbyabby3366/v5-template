@@ -137,6 +137,142 @@ function isInvalidStateReset(reason) {
   return !!(reason && reason.startsWith("Invalid state"));
 }
 
+/**
+ * Check if the restored state is stale (e.g. round drop after restore).
+ * @returns {string|null} Reset reason if stale, or null
+ */
+function checkStaleRestoredState(ts, newRound) {
+  if (ts.restored) {
+    const roundDrop = newRound < ts.round;
+    if (roundDrop) {
+      return `Invalid state: Stale state restored (saved R${ts.round} -> live R${newRound})`;
+    }
+  }
+  return null;
+}
+
+/**
+ * Detects if a new shoe was implicitly or explicitly started.
+ * @returns {string|null} Reset reason if a new shoe is detected, or null
+ */
+function checkImplicitOrExplicitNewShoe(ts, newRound, newState, prevState, newShoeId, statistics) {
+  // If the Shoe ID changed, it is always a new shoe, regardless of round number
+  if (newShoeId && ts.shoeId && newShoeId !== ts.shoeId) {
+    return `Shoe ID changed from ${ts.shoeId} to ${newShoeId}`;
+  }
+
+  const significantRoundDrop = newRound < ts.round - 1 && ts.round > 1;
+  const shoeChangedByRound = newRound === 1 && ts.round > 1;
+
+  const { forceReset, resetReason } = checkShoeResetNeeded(ts, newRound, newState, statistics);
+  const isImplicitShuffle = significantRoundDrop || shoeChangedByRound;
+
+  if (forceReset || isImplicitShuffle || (newState === "Shuffling" && prevState !== "Shuffling")) {
+    return resetReason || (newState === "Shuffling" ? "Shuffling state detected" : `Implicit shoe change detected (R${ts.round} -> R${newRound})`);
+  }
+  return null;
+}
+
+/**
+ * Check if any rounds were missed (gap between last finalized and current live round).
+ * @returns {boolean}
+ */
+function checkMissedRounds(ts, newRound) {
+  return ts.lastFinalizedRound > 0 && newRound > ts.lastFinalizedRound + 1;
+}
+
+/**
+ * Check if the round is already finalized in hand history.
+ * @returns {boolean}
+ */
+function checkIsAlreadyFinalized(ts, newRound) {
+  return !!(ts.handHistory && ts.handHistory.some(item => item && item.round === newRound));
+}
+
+// ─── Card Name → 13-slot Rank Index ─────────────────────────────────────
+// Index: 0=A, 1=2, 2=3, 3=4, 4=5, 5=6, 6=7, 7=8, 8=9, 9=T, 10=J, 11=Q, 12=K
+function cardRankToIndex(cardName) {
+  if (!cardName) return -1;
+  const rank = cardName.slice(0, -1).toUpperCase();
+
+  switch (rank) {
+    case "A":  return 0;
+    case "2":  return 1;
+    case "3":  return 2;
+    case "4":  return 3;
+    case "5":  return 4;
+    case "6":  return 5;
+    case "7":  return 6;
+    case "8":  return 7;
+    case "9":  return 8;
+    case "10":
+    case "T":  return 9;
+    case "J":  return 10;
+    case "Q":  return 11;
+    case "K":  return 12;
+    default:   return -1;
+  }
+}
+
+/**
+ * Processes hand cards, checking for impossible cards, ghost hands, and incorrect card counts.
+ * Returns the validation outcome, card count, and updated deck composition.
+ *
+ * @param {number[]} currentComposition - The current deck composition [13 ranks]
+ * @param {string[]} playerCards - Player cards array
+ * @param {string[]} bankerCards - Banker cards array
+ * @param {number} consecutiveZeroCardHands - Current consecutive zero-card hands
+ * @param {number} round - Current round number
+ * @returns {{
+ *   corruptedReason: string|null,
+ *   cardsSubtracted: number,
+ *   newComposition: number[],
+ *   nextConsecutiveZeroCardHands: number
+ * }}
+ */
+function processAndValidateCards(currentComposition, playerCards, bankerCards, consecutiveZeroCardHands, round) {
+  let cardsSubtracted = 0;
+  let corruptedReason = null;
+  const newComposition = [...currentComposition];
+  const allCards = [...(playerCards || []), ...(bankerCards || [])];
+
+  for (const card of allCards) {
+    const idx = cardRankToIndex(card);
+    if (idx >= 0) {
+      const impReason = checkImpossibleCard(newComposition, idx, card);
+      if (impReason && !corruptedReason) {
+        corruptedReason = impReason;
+      }
+      if (newComposition[idx] > 0) {
+        newComposition[idx]--;
+      }
+      cardsSubtracted++;
+    }
+  }
+
+  let nextConsecutiveZeroCardHands = consecutiveZeroCardHands;
+  if (cardsSubtracted === 0) {
+    nextConsecutiveZeroCardHands++;
+    const ghostReason = checkGhostHands(nextConsecutiveZeroCardHands);
+    if (ghostReason && !corruptedReason) {
+      corruptedReason = ghostReason;
+    }
+  } else {
+    nextConsecutiveZeroCardHands = 0;
+    const countReason = checkCardCount(cardsSubtracted, round);
+    if (countReason && !corruptedReason) {
+      corruptedReason = countReason;
+    }
+  }
+
+  return {
+    corruptedReason,
+    cardsSubtracted,
+    newComposition,
+    nextConsecutiveZeroCardHands
+  };
+}
+
 module.exports = {
   checkEventValidations,
   checkShoeResetNeeded,
@@ -147,4 +283,10 @@ module.exports = {
   checkCardCount,
   checkBeadRoadMismatch,
   isInvalidStateReset,
+  checkStaleRestoredState,
+  checkImplicitOrExplicitNewShoe,
+  checkMissedRounds,
+  checkIsAlreadyFinalized,
+  cardRankToIndex,
+  processAndValidateCards,
 };

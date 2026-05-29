@@ -3,7 +3,6 @@ const crypto = require("crypto");
 const path = require("path");
 require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
 const { launchAccount, buildAccountConfig } = require("../utils/launch_winbox");
-const { ensureMultiplayActive } = require("../utils/ensureMultiplayActive");
 const { executeBetInBrowser } = require("./executeBet");
 const { sendWhatsAppNotification } = require("../utils/whatsapp_notifier");
 
@@ -21,7 +20,6 @@ const betQueue = [];
 let isBrowserReady = false;
 let browserPage = null;
 let browserInstance = null;
-let multiplayInterval = null;
 let latestBalance = null;
 let isBetInProgress = false;
 let sessionRestartTimer = null;
@@ -393,13 +391,6 @@ async function initBrowser() {
       await updateBalance();
       sendHeartbeat();
       
-      console.log(`[Bet Module] Starting periodic check to ensure Multiplay is active...`);
-      multiplayInterval = setInterval(() => {
-        if (isBrowserReady && browserPage) {
-          ensureMultiplayActive(browserPage).catch(() => {});
-        }
-      }, 5000);
-      
       // Schedule session restart if configured
       scheduleSessionRestart(acctConfig);
       
@@ -408,10 +399,6 @@ async function initBrowser() {
          await new Promise(r => setTimeout(r, 2000));
       }
       
-      if (multiplayInterval) {
-        clearInterval(multiplayInterval);
-        multiplayInterval = null;
-      }
       if (sessionRestartTimer) {
         clearInterval(sessionRestartTimer);
         sessionRestartTimer = null;
@@ -442,10 +429,6 @@ async function initBrowser() {
       isBrowserReady = false;
       browserPage = null;
       browserInstance = null;
-      if (multiplayInterval) {
-        clearInterval(multiplayInterval);
-        multiplayInterval = null;
-      }
       if (sessionRestartTimer) {
         clearInterval(sessionRestartTimer);
         sessionRestartTimer = null;

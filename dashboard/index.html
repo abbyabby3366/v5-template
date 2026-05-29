@@ -80,18 +80,21 @@
     .tog.on{border-color:var(--cyan);color:var(--cyan);}
     body.hide-deck .dk{display:none!important;}
     body.hide-deck .dk-roads{display:none!important;}
-    .tc .bead-roads { margin-top: 3px; border-top: 1px dashed var(--border); padding-top: 3px; font-size: 8px; display: flex; flex-direction: column; gap: 2px; }
-    .tc .bead-road-row { display: flex; align-items: flex-start; gap: 4px; }
-    .tc .bead-road-label { color: var(--dim); width: 45px; flex-shrink: 0; margin-top: 2px; }
-    .tc .bead-road-list { display: flex; flex-wrap: wrap; gap: 2px; flex: 1; padding-bottom: 2px; }
-    .bead-col { display: flex; flex-direction: column; align-items: center; gap: 2px; flex-shrink: 0; }
-    .bead-num { font-size: 6px; color: var(--dim); line-height: 1; }
-    .tc .bead { width: 10px; height: 10px; border-radius: 50%; display: inline-block; text-align: center; line-height: 10px; font-size: 7px; font-weight: bold; color: #fff; flex-shrink: 0; }
+    .tc .bead-roads { margin-top: 4px; border-top: 1px dashed var(--border); padding-top: 4px; font-size: 8px; display: flex; flex-direction: column; gap: 2px; }
+    .bead-roads-unified { display: flex; flex-direction: row !important; gap: 5px; align-items: flex-start; width: 100%; }
+    .bead-road-labels { display: flex; flex-direction: column; justify-content: flex-end; gap: 3px; color: var(--dim); font-size: 6.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; width: 20px; flex-shrink: 0; padding-top: 8px; }
+    .bead-road-labels-row { height: 12px; line-height: 12px; text-align: right; }
+    .bead-road-scroll { display: flex; gap: 3px; flex-wrap: wrap; flex: 1; padding-bottom: 2px; }
+    .bead-road-scroll::-webkit-scrollbar { height: 3px; }
+    .bead-road-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    .bead-column { display: flex; flex-direction: column; align-items: center; gap: 3px; flex-shrink: 0; padding: 1px 2px; border-radius: 3px; transition: background-color 0.2s; }
+    .bead-column.mismatch { background: rgba(248, 81, 73, 0.15); border: 1px dashed var(--red); padding: 0px 1px; }
+    .bead-round-num { font-size: 6px; color: var(--dim); line-height: 1; height: 6px; }
+    .tc .bead { width: 12px; height: 12px; border-radius: 50%; display: inline-block; text-align: center; line-height: 12px; font-size: 6px; font-weight: bold; color: #fff; flex-shrink: 0; }
+    .bead.empty { background: transparent; border: 1px dashed var(--dim); }
     .bead.P { background: var(--blue); }
     .bead.B { background: var(--red); }
     .bead.T { background: var(--green); }
-    .bead-road-list::-webkit-scrollbar { height: 2px; }
-    .bead-road-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 1px; }
 
     /* Modal Styles */
     .modal-overlay { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.8); align-items:center; justify-content:center; z-index:100; }
@@ -223,8 +226,8 @@
 
     function render(t){
       const e=t.ev&&t.ev.best;
-      const pct=Math.min(100,(t.deckRemaining/416)*100);
-      const col=pct>60?'var(--green)':pct>30?'var(--yellow)':'var(--red)';
+      const pct=t.deckRemaining!=null?Math.min(100,(t.deckRemaining/416)*100):0;
+      const col=t.deckRemaining!=null?(pct>60?'var(--green)':pct>30?'var(--yellow)':'var(--red)'):'var(--border)';
       const comp=t.deckComposition||[];
 
       let dk='';
@@ -246,14 +249,37 @@
           return '';
         };
 
+        const getSourceWinnerWithPoints = (code) => {
+          if (!code) return '';
+          const parts = code.split('_');
+          const rawWinner = parts[0].toUpperCase();
+          const points = parts[1];
+
+          let winner = '';
+          if (rawWinner.startsWith('P')) winner = 'P';
+          else if (rawWinner.startsWith('B')) winner = 'B';
+          else if (rawWinner.startsWith('T')) winner = 'T';
+
+          if (winner && points) {
+            const cleanPoints = points.replace(/[^0-9]/g, '');
+            return `${winner}${cleanPoints}`;
+          }
+          if (winner) return winner;
+          return '';
+        };
+
         const isShuffling = t.state && t.state.toLowerCase().includes('shuff');
-        const totalRounds = isShuffling ? 0 : (t.sourceBeadRoad ? t.sourceBeadRoad.length : 0);
+        const maxRound = isShuffling ? 0 : Math.max(
+          t.sourceBeadRoad ? t.sourceBeadRoad.length : 0,
+          t.round || 0,
+          (t.deducedBeadRoad || []).reduce((max, x) => Math.max(max, (x && typeof x === 'object' ? x.round : 0)), 0)
+        );
+
         const deducedMap = {};
-        
         if (!isShuffling) {
           (t.deducedBeadRoad || []).forEach(item => {
             if (item && typeof item === 'object') {
-              deducedMap[item.round] = item.winner;
+              deducedMap[item.round] = item;
             }
           });
 
@@ -266,47 +292,76 @@
             t.deducedBeadRoad.forEach((item, idx) => {
               if (typeof item === 'string') {
                 const rNum = lastCompletedRound - (totalDeduced - 1 - idx);
-                deducedMap[rNum] = item;
+                deducedMap[rNum] = { round: rNum, winner: item };
               }
             });
           }
         }
 
-        const deducedList = [];
-        for (let rNum = 1; rNum <= totalRounds; rNum++) {
-          const item = (t.deducedBeadRoad || []).find(x => x && (x.round === rNum || (typeof x === 'object' && x.round === rNum)));
-          const w = item ? (typeof item === 'object' ? item.winner : item) : deducedMap[rNum];
-          
-          if (w) {
-            let titleText = `Round ${rNum}`;
-            if (item && typeof item === 'object') {
-              if (item.playerCards && item.playerCards.length) {
-                titleText += `\nPlayer: [${item.playerCards.join(', ')}]`;
-              }
-              if (item.bankerCards && item.bankerCards.length) {
-                titleText += `\nBanker: [${item.bankerCards.join(', ')}]`;
-              }
+        const columnsHtml = [];
+        for (let rNum = 1; rNum <= maxRound; rNum++) {
+          const sourceCode = t.sourceBeadRoad ? t.sourceBeadRoad[rNum - 1] : null;
+          const sWinner = mapSourceWinner(sourceCode);
+          const sDisplay = getSourceWinnerWithPoints(sourceCode);
+
+          const deducedItem = deducedMap[rNum];
+          const dWinner = deducedItem ? deducedItem.winner : null;
+          const dDisplay = (deducedItem && deducedItem.winPoints !== undefined && deducedItem.winPoints !== null)
+            ? `${dWinner}${deducedItem.winPoints}`
+            : dWinner;
+
+          // If neither is available, skip
+          if (!sWinner && !dWinner) continue;
+
+          const isMismatch = sWinner && dWinner && sWinner !== dWinner;
+          const colClass = isMismatch ? 'bead-column mismatch' : 'bead-column';
+
+          // Deduced bead HTML
+          let dBeadHtml = '';
+          if (dWinner) {
+            let titleText = `Round ${rNum} (Deduced: ${dDisplay})`;
+            if (deducedItem.playerCards && deducedItem.playerCards.length) {
+              titleText += `\nPlayer: [${deducedItem.playerCards.join(', ')}]`;
             }
-            deducedList.push(`<div class="bead-col"><span class="bead-num">${rNum}</span><span class="bead ${w}" title="${titleText}">${w}</span></div>`);
+            if (deducedItem.bankerCards && deducedItem.bankerCards.length) {
+              titleText += `\nBanker: [${deducedItem.bankerCards.join(', ')}]`;
+            }
+            if (isMismatch) {
+              titleText += `\nMISMATCH! Source shows ${sDisplay}`;
+            }
+            dBeadHtml = `<span class="bead ${dWinner}" title="${titleText}">${dDisplay}</span>`;
           } else {
-            deducedList.push(`<div class="bead-col"><span class="bead-num">${rNum}</span><span class="bead" style="background:transparent; visibility:hidden;"></span></div>`);
+            dBeadHtml = `<span class="bead empty" title="Round ${rNum} (Not Deduced)"></span>`;
           }
+
+          // Source bead HTML
+          let sBeadHtml = '';
+          if (sWinner) {
+            let titleText = `Round ${rNum} (Source: ${sDisplay})`;
+            if (isMismatch) {
+              titleText += `\nMISMATCH! Deduced shows ${dDisplay}`;
+            }
+            sBeadHtml = `<span class="bead ${sWinner}" title="${titleText}">${sWinner}</span>`;
+          } else {
+            sBeadHtml = `<span class="bead empty" title="Round ${rNum} (No Source data)"></span>`;
+          }
+
+          columnsHtml.push(`
+            <div class="${colClass}">
+              <span class="bead-round-num">${rNum}</span>
+              ${dBeadHtml}
+              ${sBeadHtml}
+            </div>
+          `);
         }
 
-        const sourceList = isShuffling ? '' : (t.sourceBeadRoad || []).map((code, index) => {
-          const w = mapSourceWinner(code);
-          const roundNum = index + 1;
-          return w ? `<div class="bead-col"><span class="bead-num">${roundNum}</span><span class="bead ${w}">${w}</span></div>` : '';
-        }).join('');
-
-        roadsHtml = `<div class="dk-roads bead-roads">
-          <div class="bead-road-row">
-            <span class="bead-road-label">Deduced:</span>
-            <div class="bead-road-list">${deducedList.join('') || '<span style="color:var(--dim)">—</span>'}</div>
+        roadsHtml = `<div class="dk-roads bead-roads bead-roads-unified">
+          <div class="bead-road-labels">
+            <div class="bead-road-labels-row">Ded</div>
+            <div class="bead-road-labels-row">Src</div>
           </div>
-          <div class="bead-road-row">
-            <span class="bead-road-label">Source:</span>
-            <div class="bead-road-list">${sourceList || '<span style="color:var(--dim)">—</span>'}</div>
+          <div class="bead-road-scroll">
+            ${columnsHtml.join('') || '<span style="color:var(--dim)">—</span>'}
           </div>
         </div>`;
       }
@@ -338,7 +393,7 @@
       return`<div class="tc${e?' edge':''}">
         <div class="top"><span class="name">${t.tableName}</span><span class="st ${stCls(t.state)}">${t.state||'—'}</span></div>
         <div class="pbar"><div class="f" style="width:${pct}%;background:${col}"></div></div>
-        <div class="info"><span style="color:var(--text)">H${t.handNumber}</span><span style="color:var(--text)">R${t.round}</span><span class="p">P${t.wins?.P??0}</span><span class="b">B${t.wins?.B??0}</span><span class="t">T${t.wins?.T??0}</span><span style="margin-left:auto">${t.deckRemaining}/416</span></div>
+        <div class="info"><span style="color:var(--text)">H${t.handNumber??'—'}</span><span style="color:var(--text)">R${t.round}</span><span class="p">P${t.wins?.P??0}</span><span class="b">B${t.wins?.B??0}</span><span class="t">T${t.wins?.T??0}</span><span style="color:var(--dim)" title="Shoe ID: ${t.shoeId||'—'}">Shoe ID:${t.shoeId||'—'}</span><span style="margin-left:auto">${t.deckRemaining!=null?t.deckRemaining:'—'}/416</span></div>
         ${lc}${dk}${roadsHtml}${evH}${errorHtml}
       </div>`;
     }

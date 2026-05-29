@@ -91,9 +91,13 @@
             if (!window.__tableStatesCache[t.roomId]) {
               const baseStoreCount = t.statistics ? t.statistics.length : 0;
               const roundCount = t.round || t.roundNo || t.roundNumber || baseStoreCount;
+              const isShuffleState = t.status === "Shuffle" || t.status === "Shuffling";
+              const tGameId = t.gameId || "N/A";
+              const initialShoeId = isShuffleState ? "waiting" : (tGameId !== "N/A" ? tGameId : null);
               window.__tableStatesCache[t.roomId] = {
                 roomId: t.roomId,
-                gameId: t.gameId || "N/A",
+                gameId: tGameId,
+                shoeId: initialShoeId,
                 status: t.status || "Unknown",
                 timeLeft: t.timeLeft ?? -1,
                 result: null,
@@ -198,6 +202,7 @@
     let roundNumber = entry.round || 0;
     let state = stateMapping[entry.status] || entry.status || "Waiting for Bets";
     let winner = null;
+    let winPoints = null;
 
     // Resolve Winner Letter & Specialized "Result" status sub-types during Payout
     if (entry.status === "PayOut") {
@@ -209,12 +214,15 @@
           if (pPoints > bPoints) {
             state = "Result (Player Win)";
             winner = "P";
+            winPoints = pPoints;
           } else if (pPoints < bPoints) {
             state = "Result (Banker Win)";
             winner = "B";
+            winPoints = bPoints;
           } else {
             state = "Result (Tie Win)";
             winner = "T";
+            winPoints = pPoints;
           }
         }
       }
@@ -226,6 +234,14 @@
         if (winner === "P") state = "Result (Player Win)";
         else if (winner === "B") state = "Result (Banker Win)";
         else if (winner === "T") state = "Result (Tie Win)";
+
+        if (serverCode) {
+          const parts = serverCode.split('_');
+          if (parts[1]) {
+            const parsedPts = parseInt(parts[1], 10);
+            if (!isNaN(parsedPts)) winPoints = parsedPts;
+          }
+        }
       }
     }
 
@@ -266,7 +282,7 @@
     return {
       tableName: name,
       tableId: roomId,
-      roundId: entry.gameId || null, // Standardized as roundId for server consumption
+      shoeId: entry.shoeId || entry.gameId || null, // Standardized as shoeId for server consumption
       state: state,
       timer: entry.timeLeft !== undefined ? entry.timeLeft : -1,
       round: roundNumber,
@@ -275,6 +291,7 @@
       bankerCards: bankerCards,
       allCards: allCards,
       winner: winner,
+      winPoints: winPoints,
       statistics: stats
     };
   }
@@ -299,9 +316,23 @@
       result = packet.result || null;
     }
 
+    // Maintain a persistent shoeId that only resets on shuffling or significant round drop
+    let shoeId = old.shoeId || null;
+    const isShuffleState = packet.status === "Shuffle" || packet.status === "Shuffling";
+    const isRoundDrop = (roundCount < old.round) || (roundCount === 1 && old.round > 1);
+
+    if (isShuffleState || isRoundDrop) {
+      shoeId = "waiting";
+    } else if (!shoeId || shoeId === "waiting" || shoeId === "N/A") {
+      if (gameId && gameId !== "N/A" && gameId !== "waiting") {
+        shoeId = gameId;
+      }
+    }
+
     window.__tableStatesCache[packet.roomId] = {
       roomId: packet.roomId,
       gameId: gameId,
+      shoeId: shoeId,
       status: packet.status,
       timeLeft: packet.timeLeft !== undefined ? packet.timeLeft : old.timeLeft,
       result: result,
