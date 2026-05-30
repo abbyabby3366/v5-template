@@ -9,12 +9,7 @@
 const { sendWhatsAppNotification } = require("../utils/whatsapp_notifier");
 const {
   checkEventValidations,
-  checkShoeResetNeeded,
   isResultState,
-  checkWarningNeeded,
-  checkImpossibleCard,
-  checkGhostHands,
-  checkCardCount,
   checkBeadRoadMismatch,
   isInvalidStateReset,
   checkStaleRestoredState,
@@ -101,7 +96,6 @@ class TableStateManager {
   constructor() {
     /** @type {Map<string, TableState>} */
     this.tables = new Map();
-    this.lastResetNotificationTime = new Map();
   }
 
   getTable(tableName) {
@@ -201,10 +195,9 @@ class TableStateManager {
 
       if (isResultState(newState) && newRound > ts.lastFinalizedRound && newRound > 0 && hasCards) {
         if (isAlreadyFinalized) {
-          this.#rateLimitedWarning(
-            `${ts.tableName}:double_deduct:${newRound}`,
-            `[WARNING] ${ts.tableName}: Double-deduction attempt guarded for completed round ${newRound}!`
-          );
+          const msg = `[WARNING] ${ts.tableName}: Double-deduction attempt guarded for completed round ${newRound}!`;
+          console.log(`\x1b[31m${msg}\x1b[0m`);
+          sendWhatsAppNotification(msg).catch(err => console.error("WhatsApp Notification failed:", err));
         } else {
           // Extract, validate, and subtract cards via stateValidators
           const {
@@ -319,15 +312,7 @@ class TableStateManager {
     return events;
   }
 
-  #rateLimitedWarning(rateLimitKey, msg, cooldownMs = 5 * 60 * 1000) {
-    const now = Date.now();
-    const lastSent = this.lastResetNotificationTime.get(rateLimitKey) || 0;
-    if (now - lastSent >= cooldownMs) {
-      console.log(`\x1b[31m${msg}\x1b[0m`);
-      sendWhatsAppNotification(msg).catch(err => console.error("WhatsApp Notification failed:", err));
-      this.lastResetNotificationTime.set(rateLimitKey, now);
-    }
-  }
+
 
   #resetShoe(ts, reason) {
     const roundInfo = (ts.round > 0 && !reason.includes("decreased from") && !reason.includes("reset from"))
