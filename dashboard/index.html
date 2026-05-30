@@ -393,7 +393,7 @@
       return`<div class="tc${e?' edge':''}">
         <div class="top"><span class="name">${t.tableName}</span><span class="st ${stCls(t.state)}">${t.state||'—'}</span></div>
         <div class="pbar"><div class="f" style="width:${pct}%;background:${col}"></div></div>
-        <div class="info"><span style="color:var(--text)">R${t.round}</span><span class="p">P${t.wins?.P??0}</span><span class="b">B${t.wins?.B??0}</span><span class="t">T${t.wins?.T??0}</span><span style="color:var(--dim)" title="Shoe ID: ${t.shoeId||'—'}">Shoe ID:${t.shoeId||'—'}</span><span style="margin-left:auto">${t.deckRemaining!=null?t.deckRemaining:'—'}/416</span></div>
+        <div class="info"><span style="color:var(--text)">R${t.round}</span><span class="p">P${t.wins?.P??0}</span><span class="b">B${t.wins?.B??0}</span><span class="t">T${t.wins?.T??0}</span><span style="margin-left:auto">${t.deckRemaining!=null?t.deckRemaining:'—'}/416</span></div>
         ${lc}${dk}${roadsHtml}${evH}${errorHtml}
       </div>`;
     }

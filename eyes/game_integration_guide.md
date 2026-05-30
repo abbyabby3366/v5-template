@@ -19,12 +19,6 @@ interface StandardizedTableState {
   tableId: string | null;
 
   /** 
-   * Unique ID for the current game round (maps from server gameId).
-   * Changes in roundId are used by tableManager to detect new shoes/rounds.
-   */
-  roundId: string | null;
-
-  /** 
    * Normalized game state. 
    * Supported: "Waiting for Bets", "Dealing", "Result", "Shuffling".
    * Note: Result states must include the "Result" suffix or be exactly "Result".

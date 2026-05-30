@@ -155,10 +155,10 @@ function checkStaleRestoredState(ts, newRound) {
  * Detects if a new shoe was implicitly or explicitly started.
  * @returns {string|null} Reset reason if a new shoe is detected, or null
  */
-function checkImplicitOrExplicitNewShoe(ts, newRound, newState, prevState, newShoeId, statistics) {
-  // If the Shoe ID changed, it is always a new shoe, regardless of round number
-  if (newShoeId && ts.shoeId && newShoeId !== ts.shoeId) {
-    return `Shoe ID changed from ${ts.shoeId} to ${newShoeId}`;
+function checkImplicitOrExplicitNewShoe(ts, newRound, newState, prevState, statistics) {
+  // 1. If newState is "Shuffling", detect "Shuffling state detected" first
+  if (newState === "Shuffling" && prevState !== "Shuffling") {
+    return "Shuffling state detected";
   }
 
   const significantRoundDrop = newRound < ts.round - 1 && ts.round > 1;
@@ -167,8 +167,8 @@ function checkImplicitOrExplicitNewShoe(ts, newRound, newState, prevState, newSh
   const { forceReset, resetReason } = checkShoeResetNeeded(ts, newRound, newState, statistics);
   const isImplicitShuffle = significantRoundDrop || shoeChangedByRound;
 
-  if (forceReset || isImplicitShuffle || (newState === "Shuffling" && prevState !== "Shuffling")) {
-    return resetReason || (newState === "Shuffling" ? "Shuffling state detected" : `Implicit shoe change detected (R${ts.round} -> R${newRound})`);
+  if (forceReset || isImplicitShuffle) {
+    return resetReason || `Implicit shoe change detected (R${ts.round} -> R${newRound})`;
   }
   return null;
 }

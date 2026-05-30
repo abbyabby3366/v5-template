@@ -36,6 +36,18 @@ function deckRemaining(composition) {
   return composition.reduce((a, b) => a + b, 0);
 }
 
+function colorizeState(stateStr) {
+  if (!stateStr) return stateStr;
+  if (/player\s*win/i.test(stateStr)) {
+    return `\x1b[94m${stateStr}\x1b[0m`; // Bright Blue
+  } else if (/banker\s*win/i.test(stateStr)) {
+    return `\x1b[31m${stateStr}\x1b[0m`; // Red
+  } else if (/tie\s*win/i.test(stateStr)) {
+    return `\x1b[32m${stateStr}\x1b[0m`; // Green
+  }
+  return stateStr;
+}
+
 function getBaccaratValue(cards) {
   if (!cards || cards.length === 0) return 0;
   let sum = 0;
@@ -57,7 +69,6 @@ class TableState {
   constructor(tableName, tableId = null) {
     this.tableName = tableName;
     this.tableId = tableId;
-    this.shoeId = null;
     this.state = null;
     this.round = 0;
     this.deckComposition = freshShoe();
@@ -114,15 +125,11 @@ class TableStateManager {
       const prevState = ts.state;
       const newState = table.state;
       const newRound = table.round;
-      const newShoeId = table.shoeId || null;
 
       // Update tableId if provided
       if (table.tableId) ts.tableId = table.tableId;
 
-      // Initialize shoeId if not set
-      if (!ts.shoeId && newShoeId) {
-        ts.shoeId = newShoeId;
-      }
+
 
       // 1. Handle stale restored state
       const staleReason = checkStaleRestoredState(ts, newRound);
@@ -138,12 +145,11 @@ class TableStateManager {
         });
         ts.state = newState;
         ts.round = newRound;
-        if (newShoeId) ts.shoeId = newShoeId;
         continue;
       }
 
       // 2. Detect implicit or explicit new shoe
-      const newShoeReason = checkImplicitOrExplicitNewShoe(ts, newRound, newState, prevState, newShoeId, table.statistics);
+      const newShoeReason = checkImplicitOrExplicitNewShoe(ts, newRound, newState, prevState, table.statistics);
       if (newShoeReason) {
         this.#resetShoe(ts, newShoeReason);
         events.push({
@@ -155,7 +161,6 @@ class TableStateManager {
         });
         ts.state = newState;
         ts.round = newRound;
-        if (newShoeId) ts.shoeId = newShoeId;
         ts.handHistory = [];
         continue;
       }
@@ -166,10 +171,7 @@ class TableStateManager {
         continue;
       }
 
-      // Track shoeId (keep constant, set only if null)
-      if (!ts.shoeId && newShoeId) {
-        ts.shoeId = newShoeId;
-      }
+
 
       // Verify hand history outcomes match server statistics ONCE per round when in Waiting for Bets
       if (newState === "Waiting for Bets" && ts.lastFinalizedRound > 0 && ts.lastVerifiedMismatchRound !== ts.lastFinalizedRound) {
@@ -285,9 +287,15 @@ class TableStateManager {
         if (isResultState(newState) && ((table.playerCards && table.playerCards.length > 0) || (table.bankerCards && table.bankerCards.length > 0))) {
           const pPoints = getBaccaratValue(table.playerCards);
           const bPoints = getBaccaratValue(table.bankerCards);
-          cardInfo = ` | P${pPoints} vs B${bPoints} | Player: [${(table.playerCards || []).join(", ")}] Banker: [${(table.bankerCards || []).join(", ")}]`;
+          const pScoreText = `\x1b[94mP${pPoints}\x1b[0m`;
+          const bScoreText = `\x1b[31mB${bPoints}\x1b[0m`;
+          const coloredP = `\x1b[94mPlayer: [${(table.playerCards || []).join(", ")}]\x1b[0m`;
+          const coloredB = `\x1b[31mBanker: [${(table.bankerCards || []).join(", ")}]\x1b[0m`;
+          cardInfo = ` | ${pScoreText} vs ${bScoreText} | ${coloredP} ${coloredB}`;
         }
-        console.log(`[STATE] ${name}: ${prevState || "None"} -> ${newState} (Round ${newRound})${cardInfo}`);
+        const coloredPrev = colorizeState(prevState || "None");
+        const coloredNew = colorizeState(newState);
+        console.log(`[STATE] ${name}: ${coloredPrev} -> ${coloredNew} (Round ${newRound})${cardInfo}`);
       }
 
       // Dispatch generic state transitions
@@ -327,7 +335,6 @@ class TableStateManager {
       : "";
     const msg = `[SHOE] ${ts.tableName}: Reset to fresh shoe (Reason: ${reason}${roundInfo})`;
 
-    ts.shoeId = null;
     ts.deckComposition = freshShoe();
     ts.lastFinalizedRound = 0;
     ts.consecutiveZeroCardHands = 0;
@@ -360,7 +367,6 @@ class TableStateManager {
       data[name] = {
         tableName: ts.tableName,
         tableId: ts.tableId,
-        shoeId: ts.shoeId,
         state: ts.state,
         round: ts.round,
         deckComposition: ts.deckComposition,
@@ -390,7 +396,6 @@ class TableStateManager {
 
     for (const [name, saved] of Object.entries(data)) {
       const ts = new TableState(name, saved.tableId || null);
-      ts.shoeId = saved.shoeId || null;
       ts.state = saved.state || null;
       ts.round = saved.round || 0;
       ts.deckComposition = saved.deckComposition || freshShoe();

@@ -103,7 +103,6 @@ async function writeDashboardJson(tables, stateManager, timestamp, events, allSc
     return {
       tableName: table.tableName,
       tableId: ts?.tableId ?? null,
-      shoeId: ts?.shoeId ?? null,
       state: table.state,
       timer: table.timer,
       round: table.round,

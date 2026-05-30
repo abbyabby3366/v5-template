@@ -91,13 +91,10 @@
             if (!window.__tableStatesCache[t.roomId]) {
               const baseStoreCount = t.statistics ? t.statistics.length : 0;
               const roundCount = t.round || t.roundNo || t.roundNumber || baseStoreCount;
-              const isShuffleState = t.status === "Shuffle" || t.status === "Shuffling";
               const tGameId = t.gameId || "N/A";
-              const initialShoeId = isShuffleState ? "waiting" : (tGameId !== "N/A" ? tGameId : null);
               window.__tableStatesCache[t.roomId] = {
                 roomId: t.roomId,
                 gameId: tGameId,
-                shoeId: initialShoeId,
                 status: t.status || "Unknown",
                 timeLeft: t.timeLeft ?? -1,
                 result: null,
@@ -282,7 +279,6 @@
     return {
       tableName: name,
       tableId: roomId,
-      shoeId: entry.shoeId || entry.gameId || null, // Standardized as shoeId for server consumption
       state: state,
       timer: entry.timeLeft !== undefined ? entry.timeLeft : -1,
       round: roundNumber,
@@ -316,23 +312,9 @@
       result = packet.result || null;
     }
 
-    // Maintain a persistent shoeId that only resets on shuffling or significant round drop
-    let shoeId = old.shoeId || null;
-    const isShuffleState = packet.status === "Shuffle" || packet.status === "Shuffling";
-    const isRoundDrop = (roundCount < old.round) || (roundCount === 1 && old.round > 1);
-
-    if (isShuffleState || isRoundDrop) {
-      shoeId = "waiting";
-    } else if (!shoeId || shoeId === "waiting" || shoeId === "N/A") {
-      if (gameId && gameId !== "N/A" && gameId !== "waiting") {
-        shoeId = gameId;
-      }
-    }
-
     window.__tableStatesCache[packet.roomId] = {
       roomId: packet.roomId,
       gameId: gameId,
-      shoeId: shoeId,
       status: packet.status,
       timeLeft: packet.timeLeft !== undefined ? packet.timeLeft : old.timeLeft,
       result: result,
