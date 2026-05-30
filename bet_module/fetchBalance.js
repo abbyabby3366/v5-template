@@ -54,12 +54,12 @@ function getPiniaStoreFromBrowser() {
  */
 async function fetchAccountBalance(page) {
   try {
-    const evaluatePromise = page.evaluate(async () => {
+    const evaluatePromise = page.evaluate(async (getAuthTokenStr, getPiniaStoreStr) => {
       const API_BASE = "https://member-api.aghippo168.com";
 
       // Re-define internal helpers so page.evaluate can access them
-      const getAuthToken = new Function(`return (${getAuthTokenFromBrowser.toString()})()`);
-      const getPiniaStore = new Function(`return (${getPiniaStoreFromBrowser.toString()})()`);
+      const getAuthToken = new Function(`return (${getAuthTokenStr})()`);
+      const getPiniaStore = new Function(`return (${getPiniaStoreStr})()`);
 
       const token = getAuthToken();
       if (!token) return null;
@@ -103,7 +103,7 @@ async function fetchAccountBalance(page) {
         }
       } catch (e) {}
       return null;
-    });
+    }, getAuthTokenFromBrowser.toString(), getPiniaStoreFromBrowser.toString());
 
     const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("queryBalance timeout")), 15000));
     return await Promise.race([evaluatePromise, timeoutPromise]);

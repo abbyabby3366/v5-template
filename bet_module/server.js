@@ -9,6 +9,7 @@ const AccountRotator = require("./src/accountRotator");
 const BrowserController = require("./src/browserController");
 const TelemetryService = require("./src/telemetryService");
 const BetQueueProcessor = require("./src/betQueueProcessor");
+const SessionManager = require("./src/sessionManager");
 const fetchAccountBalance = require("./fetchBalance");
 
 const PORT = parseInt(process.env.BET_PORT || "4001", 10);
@@ -22,13 +23,19 @@ const telemetry = new TelemetryService({ baseUrl: BASE_URL, centralUrl: CENTRAL_
 const queueProcessor = new BetQueueProcessor(telemetry);
 
 let latestBalance = null;
-let sessionRestartTimer = null;
-let isIntentionalRestart = false;
+
+const sessionManager = new SessionManager({
+  rotator,
+  browserController,
+  telemetry,
+  queueProcessor,
+  updateBalanceFn: updateBalance,
+  sendHeartbeatFn: sendHeartbeat
+});
 
 // Helper to read active account name
 function getAccountLabel() {
-  const acctConfig = rotator.getCurrentConfig();
-  return acctConfig.label || `Account_${PORT}`;
+  return sessionManager.getAccountLabel();
 }
 
 async function updateBalance() {
@@ -87,103 +94,6 @@ const server = http.createServer(async (req, res) => {
   res.end("Not found");
 });
 
-function scheduleSessionRestart(acctConfig) {
-  const minutes = acctConfig.sessionRestartMinutes;
-  if (!minutes || minutes <= 0) return;
-  
-  if (sessionRestartTimer) clearInterval(sessionRestartTimer);
-  
-  console.log(`[Session Restart] Polling enabled. Will restart ${minutes} minutes after login for ${acctConfig.label}.`);
-  const launchTime = Date.now();
-  
-  sessionRestartTimer = setInterval(async () => {
-    let loginTime = launchTime;
-    try {
-      const tsFile = path.resolve(__dirname, "..", "utils", "login_timestamps.json");
-      const timestamps = JSON.parse(fs.readFileSync(tsFile, 'utf8'));
-      if (timestamps[acctConfig.label]) loginTime = timestamps[acctConfig.label];
-    } catch (e) {}
-    
-    const elapsedMin = (Date.now() - loginTime) / 60000;
-    if (elapsedMin < minutes) return;
-    
-    clearInterval(sessionRestartTimer);
-    sessionRestartTimer = null;
-    
-    console.log(`\x1b[33m[Session Restart] ${elapsedMin.toFixed(1)} mins elapsed for ${acctConfig.label}. Graceful restart...\x1b[0m`);
-    
-    // Step 1: Temporarily signal unready to pull from dashboard RR pool
-    browserController.isBrowserReady = false;
-    sendHeartbeat();
-    
-    // Step 2: Wait for active bets to resolve
-    const maxWaitMs = 60000;
-    const startWait = Date.now();
-    while (queueProcessor.isProcessing() && (Date.now() - startWait < maxWaitMs)) {
-      console.log(`[Session Restart] Waiting for active bet to complete...`);
-      await new Promise(r => setTimeout(r, 1000));
-    }
-    
-    // Step 3: Trigger restart
-    console.log(`[Session Restart] Closing browser to trigger rotator...`);
-    isIntentionalRestart = true;
-    await browserController.close();
-  }, 30000);
-}
-
-async function initBrowserLifecycle() {
-  while (true) {
-    try {
-      const acctConfig = rotator.getCurrentConfig();
-      console.log(`\n[Bet Module] Initializing session lifecycle for ${acctConfig.label} (Index: ${rotator.getCurrentIndex()})...`);
-      
-      const { page } = await browserController.launch(acctConfig);
-      
-      // Sync initial telemetry balance & scheduling
-      await updateBalance();
-      sendHeartbeat();
-      scheduleSessionRestart(acctConfig);
-      
-      // Wait until page is closed by crash or restart signal
-      while (!page.isClosed()) {
-        await new Promise(r => setTimeout(r, 2000));
-      }
-      
-      if (sessionRestartTimer) {
-        clearInterval(sessionRestartTimer);
-        sessionRestartTimer = null;
-      }
-      
-      console.log(`\x1b[31m[Bet Module] Session cycle ended. Advancing account...\x1b[0m`);
-      if (!isIntentionalRestart) {
-        telemetry.notifyAlert(
-          `[RECOVERY] Bet module "${acctConfig.label}" relaunching. Reason: Browser closed unexpectedly.`
-        ).catch(() => {});
-      }
-      
-      isIntentionalRestart = false;
-      await browserController.close();
-      rotator.advanceToNext();
-    } catch (err) {
-      console.error("\x1b[31m[Bet Module] Lifecycle error:\x1b[0m", err.message);
-      if (!isIntentionalRestart) {
-        const acctConfig = rotator.getCurrentConfig();
-        telemetry.notifyAlert(
-          `[RECOVERY] Bet module "${acctConfig.label}" failed and is relaunching. Reason: ${err.message}`
-        ).catch(() => {});
-      }
-      isIntentionalRestart = false;
-      if (sessionRestartTimer) {
-        clearInterval(sessionRestartTimer);
-        sessionRestartTimer = null;
-      }
-      await browserController.close();
-      rotator.advanceToNext();
-      await new Promise(r => setTimeout(r, 5000));
-    }
-  }
-}
-
 server.on('error', (err) => {
   if (err.code === 'EADDRINUSE') {
     console.error(`\x1b[31m[Bet Module] FATAL: Port ${PORT} is already in use. Set unique BET_PORT.\x1b[0m`);
@@ -205,13 +115,12 @@ server.listen(PORT, () => {
     getAccountLabelFn: () => getAccountLabel(),
     onBalanceUpdatedFn: (bal) => { latestBalance = bal; },
     onForceTabRestartFn: async () => {
-      isIntentionalRestart = true;
-      await browserController.close();
+      await sessionManager.triggerRestart();
     }
   });
 
   // Start the background browser monitoring loop
-  initBrowserLifecycle();
+  sessionManager.initBrowserLifecycle();
 });
 
 async function handleShutdown(signal) {

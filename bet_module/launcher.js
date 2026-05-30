@@ -28,54 +28,49 @@ if (runnableAccounts.length === 0) {
   process.exit(1);
 }
 
-console.log(`[Launcher] Found ${runnableAccounts.length} account(s) to launch:`);
-runnableAccounts.forEach((acct, i) => {
-  const port = BASE_PORT + i;
-  console.log(`  ${i + 1}. ${acct.label || `Account ${acct.originalIndex}`} → port ${port} (index ${acct.originalIndex})`);
-});
+console.log(`[Launcher] Found ${runnableAccounts.length} account(s) to run in single-rotatable mode.`);
 console.log("");
 
 const children = [];
 
-for (let i = 0; i < runnableAccounts.length; i++) {
-  const acct = runnableAccounts[i];
-  const port = BASE_PORT + i;
-  const label = acct.label || `Account ${acct.originalIndex}`;
+const acct = runnableAccounts[0];
+const port = BASE_PORT;
+const label = acct.label || `Account ${acct.originalIndex}`;
+const prefix = `[${label}]`;
 
-  const childEnv = {
-    ...process.env,
-    BET_PORT: String(port),
-    ACCOUNT_INDEX: String(acct.originalIndex),
-  };
+console.log(`[Launcher] Spawning single rotatable runner for ${runnableAccounts.length} accounts on port ${port}...`);
 
-  const child = spawn("node", [path.join(__dirname, "server.js")], {
-    env: childEnv,
-    stdio: ["ignore", "pipe", "pipe"],
-  });
+const childEnv = {
+  ...process.env,
+  BET_PORT: String(port),
+  ACCOUNT_INDEX: String(acct.originalIndex),
+};
 
-  // Prefix each line of output with the account label
-  const prefix = `[${label}]`;
+const child = spawn("node", [path.join(__dirname, "server.js")], {
+  env: childEnv,
+  stdio: ["ignore", "pipe", "pipe"],
+});
 
-  child.stdout.on("data", (data) => {
-    const lines = data.toString().split("\n").filter(l => l.length > 0);
-    for (const line of lines) {
-      process.stdout.write(`${prefix} ${line}\n`);
-    }
-  });
+// Prefix each line of output with the account label
+child.stdout.on("data", (data) => {
+  const lines = data.toString().split("\n").filter(l => l.length > 0);
+  for (const line of lines) {
+    process.stdout.write(`${prefix} ${line}\n`);
+  }
+});
 
-  child.stderr.on("data", (data) => {
-    const lines = data.toString().split("\n").filter(l => l.length > 0);
-    for (const line of lines) {
-      process.stderr.write(`${prefix} ${line}\n`);
-    }
-  });
+child.stderr.on("data", (data) => {
+  const lines = data.toString().split("\n").filter(l => l.length > 0);
+  for (const line of lines) {
+    process.stderr.write(`${prefix} ${line}\n`);
+  }
+});
 
-  child.on("exit", (code) => {
-    console.error(`${prefix} Process exited with code ${code}`);
-  });
+child.on("exit", (code) => {
+  console.error(`${prefix} Process exited with code ${code}`);
+});
 
-  children.push(child);
-}
+children.push(child);
 
 // Graceful shutdown: forward kill signals to all children
 function cleanup() {

@@ -85,12 +85,13 @@ class BetQueueProcessor {
         
         if (!success) {
           this.consecutiveBetErrors++;
-          if (this.consecutiveBetErrors >= 3) {
+          const maxErrors = parseInt(process.env.MAX_CONSECUTIVE_BET_ERRORS || "3", 10);
+          if (this.consecutiveBetErrors >= maxErrors) {
             this.telemetryService.notifyAlert(
-              `[ALERT] Bet module "${accountLabel}" encountered 3 consecutive bet errors. Last reason: ${reason || "None"}`
+              `[ALERT] Bet module "${accountLabel}" encountered ${maxErrors} consecutive bet errors. Last reason: ${reason || "None"}`
             ).catch(() => {});
             
-            console.log(`[ALERT] 3 consecutive errors. Triggering tab restart.`);
+            console.log(`[ALERT] ${maxErrors} consecutive errors. Triggering tab restart.`);
             context.onForceTabRestartFn();
             this.consecutiveBetErrors = 0;
           }

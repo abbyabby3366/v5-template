@@ -69,9 +69,6 @@ class BrowserController {
     return { browser, page };
   }
 
-  /**
-   * Closes active browser session cleanly.
-   */
   async close() {
     this.isBrowserReady = false;
     const browser = this.browserInstance;
@@ -80,7 +77,17 @@ class BrowserController {
 
     if (browser) {
       console.log(`[Browser] Closing active browser instance...`);
-      await browser.close().catch(() => {});
+      try {
+        await Promise.race([
+          browser.close(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("browser.close() timeout")), 5000))
+        ]);
+      } catch (err) {
+        console.warn(`[Browser] browser.close() did not complete in 5s, forcing disconnect as fallback:`, err.message);
+        try {
+          await browser.disconnect();
+        } catch (e) {}
+      }
     }
   }
 }
