@@ -109,7 +109,6 @@ async function writeDashboardJson(tables, stateManager, timestamp, events, allSc
       round: table.round,
       wins: table.wins,
       previousState: ts?.state ?? null,
-      handNumber: ts?.handNumber ?? null,
       deckRemaining: ts?.remaining ?? null,
       deckComposition: deck ?? null,
       deckLabelled: deck ? Object.fromEntries(

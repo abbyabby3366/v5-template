@@ -36,6 +36,23 @@ function deckRemaining(composition) {
   return composition.reduce((a, b) => a + b, 0);
 }
 
+function getBaccaratValue(cards) {
+  if (!cards || cards.length === 0) return 0;
+  let sum = 0;
+  for (const card of cards) {
+    if (!card) continue;
+    const rank = card.slice(0, -1).toUpperCase();
+    if (rank === "A") sum += 1;
+    else if (rank === "10" || rank === "T" || rank === "J" || rank === "Q" || rank === "K") sum += 0;
+    else {
+      const val = parseInt(rank, 10);
+      if (!isNaN(val)) sum += val;
+    }
+  }
+  return sum % 10;
+}
+
+
 class TableState {
   constructor(tableName, tableId = null) {
     this.tableName = tableName;
@@ -44,17 +61,16 @@ class TableState {
     this.state = null;
     this.round = 0;
     this.deckComposition = freshShoe();
-    this.handNumber = 0;
     this.lastFinalizedRound = 0;
     this.lastEvResult = null;
     this.currentBetId = null;
     this.restored = false;
-    this.hasWarnedAhead = false;
     this.consecutiveZeroCardHands = 0;
     this.lastErrorResetReason = null;
     this.lastErrorResetTime = null;
     this.handHistory = [];
     this.lastAlertedMismatchRound = null;
+    this.lastVerifiedMismatchRound = null;
     this.lastWarnedEvRound = null;
     this.lastWarnedMissedRound = null;
   }
@@ -155,13 +171,18 @@ class TableStateManager {
         ts.shoeId = newShoeId;
       }
 
-      // Verify hand history outcomes match server statistics
-      const { mismatchFound, mismatchDetails, mismatchRound } = checkBeadRoadMismatch(ts.handHistory, table.statistics);
-      if (mismatchFound && ts.lastAlertedMismatchRound !== mismatchRound) {
-        const msg = `[WARNING] ${ts.tableName} Hand History Discrepancy! ${mismatchDetails}`;
-        console.log(`\x1b[31m${msg}\x1b[0m`);
-        sendWhatsAppNotification(msg).catch(err => console.error("WhatsApp Notification failed:", err));
-        ts.lastAlertedMismatchRound = mismatchRound;
+      // Verify hand history outcomes match server statistics ONCE per round when in Waiting for Bets
+      if (newState === "Waiting for Bets" && ts.lastFinalizedRound > 0 && ts.lastVerifiedMismatchRound !== ts.lastFinalizedRound) {
+        if (table.statistics && table.statistics.length >= ts.lastFinalizedRound) {
+          const { mismatchFound, mismatchDetails, mismatchRound } = checkBeadRoadMismatch(ts.handHistory, table.statistics);
+          if (mismatchFound && ts.lastAlertedMismatchRound !== mismatchRound) {
+            const msg = `[WARNING] ${ts.tableName} Hand History Discrepancy! ${mismatchDetails}`;
+            console.log(`\x1b[31m${msg}\x1b[0m`);
+            sendWhatsAppNotification(msg).catch(err => console.error("WhatsApp Notification failed:", err));
+            ts.lastAlertedMismatchRound = mismatchRound;
+          }
+          ts.lastVerifiedMismatchRound = ts.lastFinalizedRound;
+        }
       }
 
       // 4. Missed Round (Gap) Detection
@@ -205,7 +226,6 @@ class TableStateManager {
 
           ts.deckComposition = newComposition;
           ts.consecutiveZeroCardHands = nextConsecutiveZeroCardHands;
-          ts.handNumber++;
           ts.lastFinalizedRound = newRound;
           ts.lastWarnedMissedRound = null; // Reset warning state since we successfully completed a round
 
@@ -234,7 +254,6 @@ class TableStateManager {
               type: "HAND_COMPLETE",
               tableName: name,
               tableState: ts,
-              handNumber: ts.handNumber,
               round: newRound,
               playerCards: table.playerCards,
               bankerCards: table.bankerCards,
@@ -258,16 +277,17 @@ class TableStateManager {
           reason: invalidReason,
           finalRound: ts.round
         });
-      } else {
-        if (checkWarningNeeded(ts, newRound)) {
-          if (!ts.hasWarnedAhead) {
-            const msg = `[WARNING] ${name}: recorded hands (${ts.handNumber}) is ahead of table UI round (${newRound}). Awaiting correction.`;
-            this.#rateLimitedWarning(`${ts.tableName}:ahead_warning`, msg, 10 * 60 * 1000);
-            ts.hasWarnedAhead = true;
-          }
-        } else if (ts.handNumber <= newRound) {
-          ts.hasWarnedAhead = false;
+      }
+
+      // Log generic state changes if enabled in env
+      if (newState !== prevState && (process.env.LOG_STATE_CHANGES === "true" || process.env.LOG_STATE_CHANGES === "TRUE")) {
+        let cardInfo = "";
+        if (isResultState(newState) && ((table.playerCards && table.playerCards.length > 0) || (table.bankerCards && table.bankerCards.length > 0))) {
+          const pPoints = getBaccaratValue(table.playerCards);
+          const bPoints = getBaccaratValue(table.bankerCards);
+          cardInfo = ` | P${pPoints} vs B${bPoints} | Player: [${(table.playerCards || []).join(", ")}] Banker: [${(table.bankerCards || []).join(", ")}]`;
         }
+        console.log(`[STATE] ${name}: ${prevState || "None"} -> ${newState} (Round ${newRound})${cardInfo}`);
       }
 
       // Dispatch generic state transitions
@@ -309,14 +329,13 @@ class TableStateManager {
 
     ts.shoeId = null;
     ts.deckComposition = freshShoe();
-    ts.handNumber = 0;
     ts.lastFinalizedRound = 0;
-    ts.hasWarnedAhead = false;
     ts.consecutiveZeroCardHands = 0;
     ts.lastEvResult = null;
     ts.currentBetId = null;
     ts.handHistory = [];
     ts.lastAlertedMismatchRound = null;
+    ts.lastVerifiedMismatchRound = null;
     ts.lastWarnedEvRound = null;
     ts.lastWarnedMissedRound = null;
 
@@ -345,7 +364,6 @@ class TableStateManager {
         state: ts.state,
         round: ts.round,
         deckComposition: ts.deckComposition,
-        handNumber: ts.handNumber,
         lastFinalizedRound: ts.lastFinalizedRound,
         lastEvResult: ts.lastEvResult,
         currentBetId: ts.currentBetId,
@@ -353,8 +371,8 @@ class TableStateManager {
         lastErrorResetReason: ts.lastErrorResetReason,
         lastErrorResetTime: ts.lastErrorResetTime,
         handHistory: ts.handHistory,
-        hasWarnedAhead: ts.hasWarnedAhead,
         lastAlertedMismatchRound: ts.lastAlertedMismatchRound,
+        lastVerifiedMismatchRound: ts.lastVerifiedMismatchRound,
         lastWarnedEvRound: ts.lastWarnedEvRound,
         lastWarnedMissedRound: ts.lastWarnedMissedRound,
       };
@@ -376,15 +394,14 @@ class TableStateManager {
       ts.state = saved.state || null;
       ts.round = saved.round || 0;
       ts.deckComposition = saved.deckComposition || freshShoe();
-      ts.handNumber = saved.handNumber || 0;
       ts.lastFinalizedRound = saved.lastFinalizedRound || saved.round || 0;
       ts.lastEvResult = saved.lastEvResult || null;
       ts.currentBetId = saved.currentBetId || null;
       ts.consecutiveZeroCardHands = saved.consecutiveZeroCardHands || 0;
       ts.lastErrorResetReason = saved.lastErrorResetReason || null;
       ts.lastErrorResetTime = saved.lastErrorResetTime || null;
-      ts.hasWarnedAhead = saved.hasWarnedAhead || false;
       ts.lastAlertedMismatchRound = saved.lastAlertedMismatchRound || null;
+      ts.lastVerifiedMismatchRound = saved.lastVerifiedMismatchRound || null;
       ts.lastWarnedEvRound = saved.lastWarnedEvRound || null;
       ts.lastWarnedMissedRound = saved.lastWarnedMissedRound || null;
 

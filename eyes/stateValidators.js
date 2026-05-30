@@ -9,21 +9,15 @@
  * @returns {string|null} Reset reason, or null if valid
  */
 function checkEventValidations(ts, newRound, newState, prevState) {
-  // 1. Recorded hands significantly ahead of UI round
-  if (ts.handNumber >= newRound + 3 && newRound > 0) {
-    return `Invalid state: recorded hands (${ts.handNumber}) >= table round + 3 (${newRound + 3})`;
-  }
-
-  // 2. Mathematically invalid deck size or hard limit <= 16
-  const effectiveRound = Math.max(newRound, ts.handNumber);
-  const minExpectedCards = 416 - ((effectiveRound + 1) * 6);
+  // 1. Mathematically invalid deck size or hard limit <= 16
+  const minExpectedCards = 416 - ((newRound + 1) * 6);
   const adjustedMinCards = Math.max(0, minExpectedCards);
 
   if ((ts.remaining < adjustedMinCards || ts.remaining <= 16) && newState !== "Shuffling") {
     return `Invalid state: cards left (${ts.remaining}) critically low (<= 16) or < expected min (${adjustedMinCards}) for round ${newRound}`;
   }
 
-  // 3. Hard Limit on Round Number (Mathematically improbable)
+  // 2. Hard Limit on Round Number (Mathematically improbable)
   if (newRound > 90 && newState !== "Shuffling") {
     return `Invalid state: round number (${newRound}) mathematically exceeds standard 8-deck shoe (> 90)`;
   }
@@ -51,12 +45,9 @@ function checkShoeResetNeeded(ts, newRound, newState, statistics) {
  * @returns {boolean}
  */
 function isResultState(state) {
-  return state === "Result" || state === "Result (Player Win)" || state === "Result (Banker Win)" || state === "Result (Tie Win)";
+  return typeof state === "string" && state.startsWith("Result");
 }
 
-function checkWarningNeeded(ts, newRound) {
-  return (ts.handNumber >= newRound + 2 && newRound > 0 && ts.handNumber < newRound + 3);
-}
 
 function checkImpossibleCard(deckComposition, rankIdx, cardName) {
   if (rankIdx >= 0 && deckComposition[rankIdx] <= 0) {
@@ -105,16 +96,30 @@ function checkBeadRoadMismatch(handHistory, statistics) {
   // Check only the latest completed hand in history
   const lastItem = handHistory[handHistory.length - 1];
   if (lastItem && typeof lastItem === "object") {
-    const rNum = lastItem.round;
-    if (rNum <= statistics.length) {
-      const serverCode = statistics[rNum - 1];
+    const roundNumber = lastItem.round;
+    if (roundNumber === statistics.length) {
+      const serverCode = statistics[roundNumber - 1];
       const serverWinner = mapServerCodeToWinner(serverCode);
 
       if (serverWinner && lastItem.winner !== serverWinner) {
+        let serverScore = "";
+        if (serverCode && serverCode.includes('_')) {
+          const parts = serverCode.split('_');
+          if (parts[1]) {
+            const clean = parts[1].replace(/[^0-9]/g, '');
+            if (clean) serverScore = clean;
+          }
+        }
+
+        const deducedScore = (lastItem.winPoints !== undefined && lastItem.winPoints !== null) ? String(lastItem.winPoints) : "";
+
+        const deducedStr = deducedScore ? `${lastItem.winner}${deducedScore}` : lastItem.winner;
+        const serverStr = serverScore ? `${serverWinner}${serverScore}` : serverWinner;
+
         return {
           mismatchFound: true,
-          mismatchDetails: `Round ${rNum} mismatch: Deduced ${lastItem.winner} vs Server ${serverWinner}`,
-          mismatchRound: rNum
+          mismatchDetails: `Round ${roundNumber} mismatch: Deduced ${deducedStr} vs Server ${serverStr}`,
+          mismatchRound: roundNumber
         };
       }
     }
@@ -331,7 +336,6 @@ module.exports = {
   checkEventValidations,
   checkShoeResetNeeded,
   isResultState,
-  checkWarningNeeded,
   checkImpossibleCard,
   checkGhostHands,
   checkCardCount,

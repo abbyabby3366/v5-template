@@ -291,20 +291,20 @@
             const lastCompletedRound = isResult ? t.round : t.round - 1;
             t.deducedBeadRoad.forEach((item, idx) => {
               if (typeof item === 'string') {
-                const rNum = lastCompletedRound - (totalDeduced - 1 - idx);
-                deducedMap[rNum] = { round: rNum, winner: item };
+                const roundNumber = lastCompletedRound - (totalDeduced - 1 - idx);
+                deducedMap[roundNumber] = { round: roundNumber, winner: item };
               }
             });
           }
         }
 
         const columnsHtml = [];
-        for (let rNum = 1; rNum <= maxRound; rNum++) {
-          const sourceCode = t.sourceBeadRoad ? t.sourceBeadRoad[rNum - 1] : null;
+        for (let roundNumber = 1; roundNumber <= maxRound; roundNumber++) {
+          const sourceCode = t.sourceBeadRoad ? t.sourceBeadRoad[roundNumber - 1] : null;
           const sWinner = mapSourceWinner(sourceCode);
           const sDisplay = getSourceWinnerWithPoints(sourceCode);
 
-          const deducedItem = deducedMap[rNum];
+          const deducedItem = deducedMap[roundNumber];
           const dWinner = deducedItem ? deducedItem.winner : null;
           const dDisplay = (deducedItem && deducedItem.winPoints !== undefined && deducedItem.winPoints !== null)
             ? `${dWinner}${deducedItem.winPoints}`
@@ -319,7 +319,7 @@
           // Deduced bead HTML
           let dBeadHtml = '';
           if (dWinner) {
-            let titleText = `Round ${rNum} (Deduced: ${dDisplay})`;
+            let titleText = `Round ${roundNumber} (Deduced: ${dDisplay})`;
             if (deducedItem.playerCards && deducedItem.playerCards.length) {
               titleText += `\nPlayer: [${deducedItem.playerCards.join(', ')}]`;
             }
@@ -331,24 +331,24 @@
             }
             dBeadHtml = `<span class="bead ${dWinner}" title="${titleText}">${dDisplay}</span>`;
           } else {
-            dBeadHtml = `<span class="bead empty" title="Round ${rNum} (Not Deduced)"></span>`;
+            dBeadHtml = `<span class="bead empty" title="Round ${roundNumber} (Not Deduced)"></span>`;
           }
 
           // Source bead HTML
           let sBeadHtml = '';
           if (sWinner) {
-            let titleText = `Round ${rNum} (Source: ${sDisplay})`;
+            let titleText = `Round ${roundNumber} (Source: ${sDisplay})`;
             if (isMismatch) {
               titleText += `\nMISMATCH! Deduced shows ${dDisplay}`;
             }
             sBeadHtml = `<span class="bead ${sWinner}" title="${titleText}">${sWinner}</span>`;
           } else {
-            sBeadHtml = `<span class="bead empty" title="Round ${rNum} (No Source data)"></span>`;
+            sBeadHtml = `<span class="bead empty" title="Round ${roundNumber} (No Source data)"></span>`;
           }
 
           columnsHtml.push(`
             <div class="${colClass}">
-              <span class="bead-round-num">${rNum}</span>
+              <span class="bead-round-num">${roundNumber}</span>
               ${dBeadHtml}
               ${sBeadHtml}
             </div>
@@ -393,7 +393,7 @@
       return`<div class="tc${e?' edge':''}">
         <div class="top"><span class="name">${t.tableName}</span><span class="st ${stCls(t.state)}">${t.state||'—'}</span></div>
         <div class="pbar"><div class="f" style="width:${pct}%;background:${col}"></div></div>
-        <div class="info"><span style="color:var(--text)">H${t.handNumber??'—'}</span><span style="color:var(--text)">R${t.round}</span><span class="p">P${t.wins?.P??0}</span><span class="b">B${t.wins?.B??0}</span><span class="t">T${t.wins?.T??0}</span><span style="color:var(--dim)" title="Shoe ID: ${t.shoeId||'—'}">Shoe ID:${t.shoeId||'—'}</span><span style="margin-left:auto">${t.deckRemaining!=null?t.deckRemaining:'—'}/416</span></div>
+        <div class="info"><span style="color:var(--text)">R${t.round}</span><span class="p">P${t.wins?.P??0}</span><span class="b">B${t.wins?.B??0}</span><span class="t">T${t.wins?.T??0}</span><span style="color:var(--dim)" title="Shoe ID: ${t.shoeId||'—'}">Shoe ID:${t.shoeId||'—'}</span><span style="margin-left:auto">${t.deckRemaining!=null?t.deckRemaining:'—'}/416</span></div>
         ${lc}${dk}${roadsHtml}${evH}${errorHtml}
       </div>`;
     }
