@@ -659,6 +659,22 @@ function startDashboard(stateManager) {
       return;
     }
 
+    if (req.method === "POST" && req.url.startsWith("/api/bet-module/deregister")) {
+      try {
+        const body = await parseJSONBody(req);
+        if (body.moduleId) {
+          console.log(`[Central] Explicitly deregistered module: ${body.moduleId}`);
+          activeModules.delete(body.moduleId);
+        }
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true }));
+      } catch (e) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: false, error: e.message }));
+      }
+      return;
+    }
+
     if (req.method === "POST" && req.url.startsWith("/api/telemetry/state")) {
       try {
         const body = await parseJSONBody(req);

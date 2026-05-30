@@ -19,9 +19,9 @@ class TelemetryService {
    */
   async sendHeartbeat(accountLabel, isAccepting, latestBalance) {
     const payload = {
-      moduleId: accountLabel, // Always use active account label as module identity
+      moduleId: accountLabel, // Dynamic per active account label
       baseUrl: this.baseUrl,
-      label: accountLabel,    // Always use active account label as display label
+      label: accountLabel,    
       accounts: [{ label: accountLabel, isAcceptingBets: isAccepting, balance: latestBalance }]
     };
 
@@ -30,6 +30,22 @@ class TelemetryService {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
+      });
+    } catch (e) {
+      // Silently fail if central is offline
+    }
+  }
+
+  /**
+   * Explicitly unregisters an account module from the dashboard during rotation.
+   * @param {string} moduleId 
+   */
+  async deregister(moduleId) {
+    try {
+      await fetch(`${this.centralUrl}/api/bet-module/deregister`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ moduleId })
       });
     } catch (e) {
       // Silently fail if central is offline

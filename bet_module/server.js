@@ -128,10 +128,10 @@ async function handleShutdown(signal) {
   browserController.isBrowserReady = false;
   
   try {
-    await telemetry.sendHeartbeat(getAccountLabel(), false, latestBalance);
-    console.log(`[Bet Module] Successfully notified Central Server of shutdown.`);
+    await telemetry.deregister(getAccountLabel());
+    console.log(`[Bet Module] Successfully deregistered from Central Server.`);
   } catch (e) {
-    console.error(`[Bet Module] Failed to notify Central:`, e.message);
+    console.error(`[Bet Module] Failed to deregister from Central:`, e.message);
   }
 
   await browserController.close();

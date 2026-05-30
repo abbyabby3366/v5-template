@@ -144,6 +144,7 @@ class SessionManager {
         
         this.isIntentionalRestart = false;
         await this.browserController.close();
+        await this.telemetry.deregister(acctConfig.label).catch(() => {});
         this.rotator.advanceToNext();
       } catch (err) {
         console.error("\x1b[31m[Bet Module] Lifecycle error:\x1b[0m", err.message);
@@ -159,6 +160,7 @@ class SessionManager {
           this.sessionRestartTimer = null;
         }
         await this.browserController.close();
+        await this.telemetry.deregister(acctConfig.label).catch(() => {});
         this.rotator.advanceToNext();
         await new Promise(r => setTimeout(r, 5000));
       }
