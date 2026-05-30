@@ -270,13 +270,15 @@
       result = packet.result || null;
     }
 
+    const stats = (packet.statistics && packet.statistics.length > 0) ? packet.statistics : (old.statistics || []);
+
     window.__tableStatesCache[packet.roomId] = {
       roomId: packet.roomId,
       gameId: gameId,
       status: packet.status,
       timeLeft: packet.timeLeft !== undefined ? packet.timeLeft : old.timeLeft,
       result: result,
-      statistics: packet.statistics || old.statistics || [],
+      statistics: stats,
       round: roundCount
     };
 

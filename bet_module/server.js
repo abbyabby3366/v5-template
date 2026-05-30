@@ -14,24 +14,18 @@ const fetchAccountBalance = require("./fetchBalance");
 const PORT = parseInt(process.env.BET_PORT || "4001", 10);
 const CENTRAL_URL = process.env.CENTRAL_URL || "http://127.0.0.1:3456";
 const BASE_URL = process.env.BET_MODULE_BASE_URL || `http://127.0.0.1:${PORT}`;
-const MODULE_ID = process.env.MODULE_ID || `bet-${os.hostname()}-${PORT}`;
 const INITIAL_ACCOUNT_INDEX = parseInt(process.env.ACCOUNT_INDEX || "0", 10);
 
 const rotator = new AccountRotator(INITIAL_ACCOUNT_INDEX);
 const browserController = new BrowserController();
-const telemetry = new TelemetryService({ moduleId: MODULE_ID, baseUrl: BASE_URL, centralUrl: CENTRAL_URL });
+const telemetry = new TelemetryService({ baseUrl: BASE_URL, centralUrl: CENTRAL_URL });
 const queueProcessor = new BetQueueProcessor(telemetry);
 
 let latestBalance = null;
 let sessionRestartTimer = null;
 let isIntentionalRestart = false;
 
-// Helpers to read active config names
-function getModuleLabel() {
-  const acctConfig = rotator.getCurrentConfig();
-  return `Node (${acctConfig.platform})`;
-}
-
+// Helper to read active account name
 function getAccountLabel() {
   const acctConfig = rotator.getCurrentConfig();
   return acctConfig.label || `Account_${PORT}`;
@@ -50,7 +44,6 @@ async function updateBalance() {
 
 function sendHeartbeat() {
   telemetry.sendHeartbeat(
-    getModuleLabel(),
     getAccountLabel(),
     browserController.isReady(),
     latestBalance
@@ -226,7 +219,7 @@ async function handleShutdown(signal) {
   browserController.isBrowserReady = false;
   
   try {
-    await telemetry.sendHeartbeat(getModuleLabel(), getAccountLabel(), false, latestBalance);
+    await telemetry.sendHeartbeat(getAccountLabel(), false, latestBalance);
     console.log(`[Bet Module] Successfully notified Central Server of shutdown.`);
   } catch (e) {
     console.error(`[Bet Module] Failed to notify Central:`, e.message);

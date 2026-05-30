@@ -159,14 +159,13 @@ async function writeDashboardJson(tables, stateManager, timestamp, events, allSc
     console.error(`[STATE] Failed to write tables_state.json: ${e.message}`);
   }
 
-  // Push to Central Server in-memory cache
-  fetch("http://localhost:3456/api/telemetry/state", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
-  }).catch(() => {
-    // Quietly ignore if central server is offline
-  });
+  // Push to Central Server via WebSockets (using dynamic import to prevent circular dependency)
+  try {
+    const { sendStateOverWS } = require("./runEyes");
+    sendStateOverWS(payload);
+  } catch (err) {
+    // Ignore quietly
+  }
 }
 
 module.exports = {

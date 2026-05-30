@@ -186,119 +186,102 @@ async function runEventBasedEyes(pageRef, extractorCode, acctConfig) {
   return false;
 }
 
-// ─── Local Loopback IPC Server ──────────────────────────────────────────
-const http = require("http");
+// ─── WebSocket Telemetry Client ──────────────────────────────────────────
+const WebSocket = require("ws");
+let wsClient = null;
+let wsActive = false;
+let wsHeartbeatTimer = null;
 
-function startLoopbackServer() {
-  const server = http.createServer(async (req, res) => {
-    if (req.method === "POST" && req.url === "/reset-all") {
-      try {
-        console.log("[IPC] Received manual /reset-all request from dashboard.");
+function connectToCentralWS() {
+  const wsUrl = "ws://127.0.0.1:3456/ws/telemetry?type=scraper";
+  console.log(`[WS-Client] Connecting to Dashboard central server: ${wsUrl}`);
 
+  wsClient = new WebSocket(wsUrl);
+
+  wsClient.on("open", () => {
+    console.log("\x1b[32m[WS-Client] Connected to Dashboard central server successfully.\x1b[0m");
+    wsActive = true;
+
+    // Start heartbeat pings
+    if (wsHeartbeatTimer) clearInterval(wsHeartbeatTimer);
+    wsHeartbeatTimer = setInterval(() => {
+      if (wsClient && wsClient.readyState === WebSocket.OPEN) {
+        wsClient.send(JSON.stringify({ type: "heartbeat" }));
+      }
+    }, 15000);
+
+    // Proactively push current loaded state to populate dashboard instantly on connect
+    pushCurrentState();
+  });
+
+  wsClient.on("message", async (data) => {
+    try {
+      const message = JSON.parse(data.toString());
+      console.log(`[WS-Client] Received message type: ${message.type}`);
+
+      if (message.type === "reset-all") {
+        console.log("[WS-Client] Triggering manual /reset-all Shoe Clear.");
         for (const ts of stateManager.tables.values()) {
-          stateManager._resetShoe(ts, "Manual reset all from dashboard via loopback");
+          stateManager._resetShoe(ts, "Manual reset all from dashboard via WS");
         }
-
         saveState(stateManager, eventLog);
-
-        // Immediate push update to dashboard
-        const allTables = Array.from(latestScrapedTables.values());
-        const { ignoredTables, config: dynamicConfig } = config.getDynamicConfig();
-        const timestamp = new Date().toISOString().replace(/:/g, "-").split(".")[0];
-
-        await writeDashboardJson(
-          allTables,
-          stateManager,
-          timestamp,
-          [],
-          Array.from(latestScrapedTables.keys()),
-          ignoredTables,
-          dynamicConfig,
-          eventLog
-        );
-
-        res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ ok: true, message: "All tables successfully reset in memory" }));
-      } catch (err) {
-        console.error("[IPC] Failed to reset all tables:", err.message);
-        res.writeHead(500, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: err.message }));
-      }
-      return;
-    }
-
-    if (req.method === "POST" && req.url.startsWith("/reset?")) {
-      try {
-        const url = new URL(req.url, "http://localhost");
-        const tableName = url.searchParams.get("table");
-
-        if (!tableName) {
-          res.writeHead(400, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ error: "Missing table param" }));
-          return;
-        }
-
-        console.log(`[IPC] Received manual /reset request for table ${tableName} from dashboard.`);
-
+        await pushCurrentState();
+      } else if (message.type === "reset") {
+        const tableName = message.table;
+        console.log(`[WS-Client] Triggering manual /reset Shoe Clear for table: ${tableName}`);
         const ts = stateManager.getTable(tableName);
-        if (!ts) {
-          res.writeHead(404, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ error: `Table ${tableName} not found in stateManager` }));
-          return;
+        if (ts) {
+          stateManager._resetShoe(ts, "Manual reset from dashboard via WS");
+          saveState(stateManager, eventLog);
+          await pushCurrentState();
         }
-
-        stateManager._resetShoe(ts, "Manual reset from dashboard via loopback");
-        saveState(stateManager, eventLog);
-
-        // Immediate push update to dashboard
-        const allTables = Array.from(latestScrapedTables.values());
-        const { ignoredTables, config: dynamicConfig } = config.getDynamicConfig();
-        const timestamp = new Date().toISOString().replace(/:/g, "-").split(".")[0];
-
-        await writeDashboardJson(
-          allTables,
-          stateManager,
-          timestamp,
-          [],
-          Array.from(latestScrapedTables.keys()),
-          ignoredTables,
-          dynamicConfig,
-          eventLog
-        );
-
-        res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ ok: true, table: tableName, deckRemaining: ts.remaining }));
-      } catch (err) {
-        console.error("[IPC] Failed to reset table:", err.message);
-        res.writeHead(500, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: err.message }));
       }
-      return;
-    }
-
-    res.writeHead(404);
-    res.end("Not found");
-  });
-
-  const IPC_PORT = 3455;
-  server.listen(IPC_PORT, "127.0.0.1", () => {
-    console.log(`[IPC] Loopback server listening on http://127.0.0.1:${IPC_PORT}`);
-  });
-
-  server.on("error", (err) => {
-    if (err.code === "EADDRINUSE") {
-      console.warn(`[IPC] Port ${IPC_PORT} already in use, loopback server might be already running.`);
-    } else {
-      console.error("[IPC] Server error:", err.message);
+    } catch (err) {
+      console.error("[WS-Client] Error handling message:", err.message);
     }
   });
 
-  // Graceful shutdown
-  process.on("SIGINT", () => { server.close(() => {}); });
-  process.on("SIGTERM", () => { server.close(() => {}); });
+  wsClient.on("close", () => {
+    console.warn("[WS-Client] Connection to Dashboard lost. Reconnecting in 5 seconds...");
+    wsActive = false;
+    if (wsHeartbeatTimer) clearInterval(wsHeartbeatTimer);
+    wsClient = null;
+    setTimeout(connectToCentralWS, 5000);
+  });
+
+  wsClient.on("error", (err) => {
+    // Quietly catch errors when dashboard server is offline
+  });
 }
 
-// Start loopback server immediately on module load
-startLoopbackServer();
+async function pushCurrentState() {
+  try {
+    const allTables = Array.from(latestScrapedTables.values());
+    const { ignoredTables, config: dynamicConfig } = config.getDynamicConfig();
+    const timestamp = new Date().toISOString().replace(/:/g, "-").split(".")[0];
 
-module.exports = { runEventBasedEyes, stateManager };
+    await writeDashboardJson(
+      allTables,
+      stateManager,
+      timestamp,
+      [],
+      Array.from(latestScrapedTables.keys()),
+      ignoredTables,
+      dynamicConfig,
+      eventLog
+    );
+  } catch (err) {
+    console.error("[WS-Client] Failed to push current state:", err.message);
+  }
+}
+
+function sendStateOverWS(payload) {
+  if (wsClient && wsClient.readyState === WebSocket.OPEN) {
+    wsClient.send(JSON.stringify({ type: "state", data: payload }));
+  }
+}
+
+// Start WebSocket client immediately on module load
+connectToCentralWS();
+
+module.exports = { runEventBasedEyes, stateManager, sendStateOverWS };

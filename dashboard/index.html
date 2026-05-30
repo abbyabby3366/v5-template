@@ -25,8 +25,14 @@
 
     .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:2px;padding:3px;flex:1;overflow-y:auto;align-content:start;}
 
-    .log-panel{width:280px;border-left:1px solid var(--border);background:#0d1117;overflow-y:auto;flex-shrink:0;display:flex;flex-direction:column;}
-    .log-title{padding:4px 6px;font-size:10px;font-weight:600;color:var(--yellow);border-bottom:1px solid var(--border);flex-shrink:0;}
+    .log-panel{width:280px;border-left:1px solid var(--border);background:#0d1117;overflow-y:auto;flex-shrink:0;display:flex;flex-direction:column;transition:width 0.2s cubic-bezier(0.4, 0, 0.2, 1);}
+    .log-panel.collapsed{width:24px!important;overflow:hidden;}
+    .log-panel.collapsed .log-list{display:none!important;}
+    .log-panel.collapsed .log-title{writing-mode:vertical-rl;text-orientation:mixed;height:100%;border-bottom:none;align-items:center;padding:8px 0;cursor:pointer;}
+    .log-panel.collapsed .log-title .toggle-btn{transform:rotate(180deg);margin-top:5px;}
+    .log-title{padding:4px 6px;font-size:10px;font-weight:600;color:var(--yellow);border-bottom:1px solid var(--border);flex-shrink:0;display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none;}
+    .log-title .toggle-btn{font-size:8px;color:var(--dim);border:1px solid var(--border);padding:0px 3px;border-radius:2px;background:none;cursor:pointer;transition:transform 0.2s ease;}
+    .log-title:hover .toggle-btn{border-color:var(--yellow);color:var(--yellow);}
     .log-list{flex:1;overflow-y:auto;padding:2px;}
     .log-item{padding:3px 5px;border-bottom:1px solid rgba(255,255,255,.03);font-size:9px;line-height:1.4;}
     .log-item .lt{color:var(--dim);}
@@ -121,6 +127,7 @@
       <button class="tog" onclick="openShufflesStats()">Shuffles Stats</button>
       <button class="tog" id="deckToggle" onclick="toggleDeck()">Deck</button>
       <button class="tog" id="edgeToggle" onclick="toggleEdge()">Edge Only</button>
+      <span id="scraperStatus" style="color:var(--red); border:1px solid var(--border); padding:1px 5px; border-radius:2px; font-size:9px; font-weight:600; display:inline-block; vertical-align:middle;">🔴 SCRAPER OFFLINE</span>
       <span class="live">● LIVE</span>
       <span id="ts">—</span>
       <span id="tc" style="color: white; font-weight: 600;">0</span>
@@ -128,8 +135,11 @@
   </div>
   <div class="main">
     <div class="grid" id="g"></div>
-    <div class="log-panel">
-      <div class="log-title">Event Log (last 100)</div>
+    <div class="log-panel" id="logPanel">
+      <div class="log-title" id="logTitle" onclick="toggleLogPanel()">
+        <span id="logTitleText">Event Log (last 100)</span>
+        <span class="toggle-btn" id="logToggleBtn">➔</span>
+      </div>
       <div class="log-list" id="log"></div>
     </div>
   </div>
@@ -448,47 +458,117 @@
     let lastTimestampStr = '';
     let currentAllTables = [];
     let currentIgnoredTables = [];
+    let wsInstance = null;
+    let wsActive = false;
+
+    function initWebSocket() {
+      const wsProtocol = location.protocol === "https:" ? "wss:" : "ws:";
+      const wsUrl = `${wsProtocol}//${location.host}/ws/telemetry?type=ui`;
+      
+      console.log("[WS] Connecting to central WebSocket...");
+      wsInstance = new WebSocket(wsUrl);
+
+      wsInstance.onopen = () => {
+        console.log("[WS] Connected to dashboard telemetry feed.");
+        wsActive = true;
+        document.getElementById("scraperStatus").style.borderColor = "var(--border)";
+      };
+
+      wsInstance.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          
+          if (payload.type === "init") {
+            updateScraperStatus(payload.scraper_status);
+            if (payload.state) {
+              applyStateUpdate(payload.state);
+            }
+          } else if (payload.type === "scraper_status") {
+            updateScraperStatus(payload.status);
+          } else if (payload.type === "state") {
+            if (payload.data) {
+              applyStateUpdate(payload.data);
+            }
+          }
+        } catch (e) {
+          console.error("[WS] Error parsing WebSocket message:", e);
+        }
+      };
+
+      wsInstance.onclose = () => {
+        console.warn("[WS] Connection lost. Falling back to HTTP polling...");
+        wsActive = false;
+        updateScraperStatus("offline");
+        
+        // Retry connection in 3 seconds
+        setTimeout(initWebSocket, 3000);
+      };
+
+      wsInstance.onerror = (err) => {
+        console.error("[WS] Socket error:", err);
+        wsInstance.close();
+      };
+    }
+
+    function updateScraperStatus(status) {
+      const badge = document.getElementById("scraperStatus");
+      if (status === "online") {
+        badge.style.color = "var(--green)";
+        badge.textContent = "🟢 SCRAPER ONLINE";
+      } else {
+        badge.style.color = "var(--red)";
+        badge.textContent = "🔴 SCRAPER OFFLINE";
+      }
+    }
+
+    function applyStateUpdate(d) {
+      if (!d) return;
+
+      if (d.timestamp !== lastTimestampStr) {
+        lastTimestampStr = d.timestamp;
+        lastPollSuccess = Date.now();
+      }
+
+      if (d.allScrapedTables) currentAllTables = d.allScrapedTables;
+      if (d.ignoredTables) currentIgnoredTables = d.ignoredTables;
+
+      if (d.config) {
+        MIN_EV = d.config.minEvThreshold || 0.0015;
+        window.currentConfig = d.config;
+      }
+      
+      let tsText = d.timestamp || '—';
+      if (d.timestamp && d.timestamp.includes('T')) {
+        const parts = d.timestamp.split('T');
+        const dObj = new Date(parts[0] + 'T' + parts[1].replace(/-/g, ':') + 'Z');
+        if (!isNaN(dObj)) tsText = dObj.toLocaleString('sv-SE', { timeZone: 'Asia/Singapore' });
+      }
+      document.getElementById('ts').textContent = tsText;
+      
+      let filtered = d.tables || [];
+      if (currentIgnoredTables && currentIgnoredTables.length) {
+        filtered = filtered.filter(t => !currentIgnoredTables.includes(t.tableName));
+      }
+      if (edgeOnly) {
+        filtered = filtered.filter(hasEdge);
+      }
+      
+      document.getElementById('tc').textContent = filtered.length === 1 ? '1 table' : filtered.length + ' tables';
+      const g = document.getElementById('g');
+      g.innerHTML = filtered.length ? filtered.map(render).join('') : `<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--dim)">${edgeOnly ? 'No tables with edge' : 'No active tables'}</div>`;
+      document.getElementById('log').innerHTML = renderLog(d.eventLog);
+    }
 
     async function poll(){
+      if (wsActive) return; // Skip HTTP fetch if WebSocket is active
       try{
         const r=await fetch('/tables_state.json?'+Date.now());
         if(!r.ok)return;
         const d=await r.json();
-        
-        if (d.timestamp !== lastTimestampStr) {
-          lastTimestampStr = d.timestamp;
-          lastPollSuccess = Date.now();
-        }
-
-        if (d.allScrapedTables) currentAllTables = d.allScrapedTables;
-        if (d.ignoredTables) currentIgnoredTables = d.ignoredTables;
-
-        if(d.config){
-          MIN_EV=d.config.minEvThreshold||0.0015;
-          window.currentConfig = d.config;
-        }
-        let tsText = d.timestamp || '—';
-        if (d.timestamp && d.timestamp.includes('T')) {
-          const parts = d.timestamp.split('T');
-          const dObj = new Date(parts[0] + 'T' + parts[1].replace(/-/g, ':') + 'Z');
-          if (!isNaN(dObj)) tsText = dObj.toLocaleString('sv-SE', { timeZone: 'Asia/Singapore' });
-        }
-        document.getElementById('ts').textContent=tsText;
-        
-        let filtered = d.tables || [];
-        if (currentIgnoredTables && currentIgnoredTables.length) {
-          filtered = filtered.filter(t => !currentIgnoredTables.includes(t.tableName));
-        }
-        if (edgeOnly) {
-          filtered = filtered.filter(hasEdge);
-        }
-        
-        document.getElementById('tc').textContent = filtered.length === 1 ? '1 table' : filtered.length + ' tables';
-        const g=document.getElementById('g');
-        g.innerHTML=filtered.length ? filtered.map(render).join('') : `<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--dim)">${edgeOnly ? 'No tables with edge' : 'No active tables'}</div>`;
-        document.getElementById('log').innerHTML=renderLog(d.eventLog);
+        applyStateUpdate(d);
       }catch(e){}
     }
+    initWebSocket();
     poll();setInterval(poll,1000);
 
     async function resetTable(name){
@@ -643,6 +723,31 @@
 
     function closeShufflesStats() {
       document.getElementById('shufflesModal').style.display = 'none';
+    }
+
+    let logCollapsed = localStorage.getItem('logCollapsed') === 'true';
+    applyLogPanelState();
+
+    function toggleLogPanel() {
+      logCollapsed = !logCollapsed;
+      localStorage.setItem('logCollapsed', logCollapsed);
+      applyLogPanelState();
+    }
+
+    function applyLogPanelState() {
+      const panel = document.getElementById('logPanel');
+      const btn = document.getElementById('logToggleBtn');
+      const text = document.getElementById('logTitleText');
+      if (!panel || !btn || !text) return;
+      if (logCollapsed) {
+        panel.classList.add('collapsed');
+        btn.textContent = '◀';
+        text.textContent = 'Log';
+      } else {
+        panel.classList.remove('collapsed');
+        btn.textContent = '➔';
+        text.textContent = 'Event Log (last 100)';
+      }
     }
   </script>
 </body>

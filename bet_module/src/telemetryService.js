@@ -3,28 +3,25 @@ const { sendWhatsAppNotification } = require("../../utils/whatsapp_notifier");
 class TelemetryService {
   /**
    * @param {Object} config 
-   * @param {string} config.moduleId 
    * @param {string} config.baseUrl 
    * @param {string} config.centralUrl 
    */
   constructor(config) {
-    this.moduleId = config.moduleId;
     this.baseUrl = config.baseUrl;
     this.centralUrl = config.centralUrl;
   }
 
   /**
-   * Reports system status to the central dashboard server.
-   * @param {string} moduleLabel 
+   * Reports system status to the central dashboard server using the active accountLabel.
    * @param {string} accountLabel 
    * @param {boolean} isAccepting 
    * @param {string|null} latestBalance 
    */
-  async sendHeartbeat(moduleLabel, accountLabel, isAccepting, latestBalance) {
+  async sendHeartbeat(accountLabel, isAccepting, latestBalance) {
     const payload = {
-      moduleId: this.moduleId,
+      moduleId: accountLabel, // Always use active account label as module identity
       baseUrl: this.baseUrl,
-      label: moduleLabel,
+      label: accountLabel,    // Always use active account label as display label
       accounts: [{ label: accountLabel, isAcceptingBets: isAccepting, balance: latestBalance }]
     };
 

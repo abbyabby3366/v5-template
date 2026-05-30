@@ -1,4 +1,5 @@
 const http = require("http");
+const ws = require("ws");
 const fs = require("fs");
 const path = require("path");
 require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
@@ -38,6 +39,8 @@ const ROOT = path.join(__dirname, "..");
 
 let _stateManager = null;
 let latestStateInMemory = null;
+let scraperSocket = null;
+const uiSockets = new Set();
 const betLog = [];
 const centralBetQueue = [];
 const MAX_BET_LOG = 1000;
@@ -1046,21 +1049,18 @@ function startDashboard(stateManager) {
 
     if (req.method === "POST" && req.url === "/reset-all") {
       if (!_stateManager) {
-        try {
-          const resp = await fetch("http://127.0.0.1:3455/reset-all", { method: "POST" });
-          if (!resp.ok) {
-            let errMsg = `HTTP ${resp.status}`;
-            try { const body = await resp.json(); errMsg = body.error || errMsg; } catch (e) {}
-            res.writeHead(resp.status, { "Content-Type": "application/json" });
-            res.end(JSON.stringify({ error: `Forwarding failed: ${errMsg}` }));
-            return;
-          }
-          const data = await resp.json();
-          res.writeHead(200, { "Content-Type": "application/json" });
-          res.end(JSON.stringify(data));
-        } catch (err) {
+        if (!scraperSocket || scraperSocket.readyState !== ws.OPEN) {
           res.writeHead(503, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ error: `Eyes client offline or unreachable: ${err.message}` }));
+          res.end(JSON.stringify({ error: "Scraper client is offline or disconnected" }));
+          return;
+        }
+        try {
+          scraperSocket.send(JSON.stringify({ type: "reset-all" }));
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ ok: true, message: "Reset command successfully sent to scraper" }));
+        } catch (err) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: `Failed to transmit reset command: ${err.message}` }));
         }
         return;
       }
@@ -1087,21 +1087,18 @@ function startDashboard(stateManager) {
       }
 
       if (!_stateManager) {
-        try {
-          const resp = await fetch(`http://127.0.0.1:3455/reset?table=${encodeURIComponent(tableName)}`, { method: "POST" });
-          if (!resp.ok) {
-            let errMsg = `HTTP ${resp.status}`;
-            try { const body = await resp.json(); errMsg = body.error || errMsg; } catch (e) {}
-            res.writeHead(resp.status, { "Content-Type": "application/json" });
-            res.end(JSON.stringify({ error: `Forwarding failed: ${errMsg}` }));
-            return;
-          }
-          const data = await resp.json();
-          res.writeHead(200, { "Content-Type": "application/json" });
-          res.end(JSON.stringify(data));
-        } catch (err) {
+        if (!scraperSocket || scraperSocket.readyState !== ws.OPEN) {
           res.writeHead(503, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ error: `Eyes client offline or unreachable: ${err.message}` }));
+          res.end(JSON.stringify({ error: "Scraper client is offline or disconnected" }));
+          return;
+        }
+        try {
+          scraperSocket.send(JSON.stringify({ type: "reset", table: tableName }));
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ ok: true, table: tableName, message: `Reset command successfully sent to scraper` }));
+        } catch (err) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: `Failed to transmit reset command: ${err.message}` }));
         }
         return;
       }
@@ -1165,6 +1162,89 @@ function startDashboard(stateManager) {
       });
       res.end(data);
     });
+  });
+
+  // Create WebSocket Server
+  const wss = new ws.WebSocketServer({ noServer: true });
+
+  wss.on("connection", (socket, request) => {
+    const url = new URL(request.url, "http://localhost");
+    const clientType = url.searchParams.get("type"); // "scraper" or "ui"
+
+    if (clientType === "scraper") {
+      console.log("[WS] Scraper client connected.");
+      scraperSocket = socket;
+
+      // Broadcast status update
+      broadcastToUI({ type: "scraper_status", status: "online" });
+
+      socket.on("message", (message) => {
+        try {
+          const payload = JSON.parse(message);
+          if (payload.type === "state") {
+            latestStateInMemory = payload.data;
+            broadcastToUI({ type: "state", data: latestStateInMemory });
+          } else if (payload.type === "heartbeat") {
+            // Silence heartbeats
+          }
+        } catch (e) {
+          console.error("[WS] Error parsing scraper message:", e.message);
+        }
+      });
+
+      socket.on("close", () => {
+        console.log("[WS] Scraper client disconnected.");
+        if (scraperSocket === socket) {
+          scraperSocket = null;
+        }
+        broadcastToUI({ type: "scraper_status", status: "offline" });
+      });
+
+      socket.on("error", (err) => {
+        console.error("[WS] Scraper socket error:", err.message);
+      });
+
+      // Welcome scraper
+      socket.send(JSON.stringify({ type: "welcome", config: betConfig }));
+    } else {
+      // Browser UI connection
+      uiSockets.add(socket);
+
+      // Welcome UI with initial states
+      socket.send(JSON.stringify({
+        type: "init",
+        scraper_status: scraperSocket ? "online" : "offline",
+        state: latestStateInMemory
+      }));
+
+      socket.on("close", () => {
+        uiSockets.delete(socket);
+      });
+
+      socket.on("error", () => {
+        uiSockets.delete(socket);
+      });
+    }
+  });
+
+  function broadcastToUI(msg) {
+    const serialized = JSON.stringify(msg);
+    for (const client of uiSockets) {
+      if (client.readyState === ws.OPEN) {
+        client.send(serialized);
+      }
+    }
+  }
+
+  // Handle upgrade HTTP -> WS
+  server.on("upgrade", (request, socket, head) => {
+    if (request.url.startsWith("/ws/telemetry")) {
+      wss.handleUpgrade(request, socket, head, (wsClient) => {
+        wss.emit("connection", wsClient, request);
+      });
+    } else {
+      socket.destroy();
+    }
   });
 
   server.listen(PORT, () => {
