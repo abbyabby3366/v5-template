@@ -1,6 +1,6 @@
 [
   {
-    "label": "PG Bet Winbox",
+    "label": "PG Bet Winbox 1",
     "platform": "winbox",
     "launchMethod": "connect",
     "enableDomCleanup": false,
@@ -9,8 +9,22 @@
     "sessionRestartMinutes": 120,
     "run": true,
     "credentials": {
-      "email": "YOUR_EMAIL",
-      "password": "YOUR_PASSWORD"
+      "email": "YOUR_EMAIL_1",
+      "password": "YOUR_PASSWORD_1"
+    }
+  },
+  {
+    "label": "PG Bet Winbox 2",
+    "platform": "winbox",
+    "launchMethod": "connect",
+    "enableDomCleanup": false,
+    "profileIndex": 13,
+    "debuggingPort": 12324,
+    "sessionRestartMinutes": 120,
+    "run": true,
+    "credentials": {
+      "email": "YOUR_EMAIL_2",
+      "password": "YOUR_PASSWORD_2"
     }
   }
 ]

@@ -14,7 +14,7 @@ const BASE_URL = process.env.BET_MODULE_BASE_URL || `http://127.0.0.1:${PORT}`;
 // MODULE_ID must be globally unique across machines. Derive from BASE_URL so
 // two computers both using port 4001 don't collide in the dashboard's Map.
 const MODULE_ID = process.env.MODULE_ID || `bet-${os.hostname()}-${PORT}`;
-const ACCOUNT_INDEX = parseInt(process.env.ACCOUNT_INDEX || "0", 10);
+let currentAccountIndex = parseInt(process.env.ACCOUNT_INDEX || "0", 10);
 
 const betQueue = [];
 let isBrowserReady = false;
@@ -27,9 +27,43 @@ let isIntentionalRestart = false;
 let consecutiveBetErrors = 0;
 
 const initialAccountsPath = path.resolve(__dirname, "json", "bet_accounts.json");
-const initialAcctConfig = buildAccountConfig(ACCOUNT_INDEX, initialAccountsPath);
+const initialAcctConfig = buildAccountConfig(currentAccountIndex, initialAccountsPath);
 let currentModuleLabel = `Node (${initialAcctConfig.platform})`;
 let currentAccountLabel = initialAcctConfig.label || `Account_${PORT}`;
+
+// Dynamically rotate to the next account having "run": true
+function advanceToNextAccount() {
+  const accountsPath = path.resolve(__dirname, "json", "bet_accounts.json");
+  let accounts = [];
+  try {
+    const fs = require("fs");
+    accounts = JSON.parse(fs.readFileSync(accountsPath, "utf-8"));
+  } catch (err) {
+    console.error(`[Rotation] Failed to read ${accountsPath} for rotating:`, err.message);
+    return;
+  }
+
+  const runnableIndices = accounts
+    .map((acct, index) => ({ ...acct, originalIndex: index }))
+    .filter((acct) => acct.run === true)
+    .map((acct) => acct.originalIndex);
+
+  if (runnableIndices.length <= 1) {
+    console.log(`[Rotation] Only ${runnableIndices.length} runnable account found. No rotation change needed.`);
+    return;
+  }
+
+  // Find position of current index in the runnable list
+  const currentPos = runnableIndices.indexOf(currentAccountIndex);
+  let nextPos = 0;
+  if (currentPos !== -1) {
+    nextPos = (currentPos + 1) % runnableIndices.length;
+  }
+  const prevIndex = currentAccountIndex;
+  currentAccountIndex = runnableIndices[nextPos];
+  console.log(`[Rotation] Rotated active account index: ${prevIndex} → ${currentAccountIndex}`);
+}
+
 
 function parseJSONBody(req) {
   return new Promise((resolve, reject) => {
@@ -310,19 +344,13 @@ function scheduleSessionRestart(acctConfig) {
       console.log(`\x1b[31m[Session Restart] Bet still in progress after ${maxWaitMs / 1000}s, forcing restart anyway.\x1b[0m`);
     }
     
-    // Step 3: Close Winbox and Game pages, but leave the default about:blank to keep Chrome alive
-    console.log(`[Session Restart] Closing Winbox and Game pages to force a fresh login...`);
+    // Step 3: Close the entire browser to trigger rotation
+    console.log(`[Session Restart] Closing browser to trigger rotation to next account...`);
     isIntentionalRestart = true;
     try {
       if (browserInstance) {
-        const allPages = await browserInstance.pages();
-        for (const p of allPages) {
-          const url = p.url() || "";
-          if (url !== "about:blank" && !url.startsWith("chrome://")) {
-            await p.close().catch(() => {});
-          }
-        }
-        console.log(`[Session Restart] Winbox and Game pages closed. Default page kept alive.`);
+        await browserInstance.close().catch(() => {});
+        console.log(`[Session Restart] Browser closed.`);
         
         // Update login timestamp to prevent immediate re-triggering in subsequent loops
         try {
@@ -338,7 +366,7 @@ function scheduleSessionRestart(acctConfig) {
         }
       }
     } catch (e) {
-      console.error(`[Session Restart] Error closing pages:`, e.message);
+      console.error(`[Session Restart] Error closing browser:`, e.message);
     }
     
     // The initBrowser loop will detect page.isClosed() and relaunch via launchAccount
@@ -350,7 +378,7 @@ async function initBrowser() {
   
   // Reset the login timestamp for this account when the process first launches
   try {
-    const acctConfig = buildAccountConfig(ACCOUNT_INDEX, accountsPath);
+    const acctConfig = buildAccountConfig(currentAccountIndex, accountsPath);
     const fs = require('fs');
     const tsFile = path.resolve(__dirname, "..", "utils", "login_timestamps.json");
     let timestamps = {};
@@ -362,10 +390,10 @@ async function initBrowser() {
   while (true) {
     let browserContext = null;
     try {
-      const acctConfig = buildAccountConfig(ACCOUNT_INDEX, accountsPath); 
+      const acctConfig = buildAccountConfig(currentAccountIndex, accountsPath); 
       currentModuleLabel = `Node (${acctConfig.platform})`;
       currentAccountLabel = acctConfig.label || `Account_${PORT}`;
-      console.log(`\n[Bet Module] Starting browser launch sequence for ${currentAccountLabel} (Account Index: ${ACCOUNT_INDEX})...`);
+      console.log(`\n[Bet Module] Starting browser launch sequence for ${currentAccountLabel} (Account Index: ${currentAccountIndex})...`);
       
       const { browser, page } = await launchAccount(acctConfig);
       browserContext = browser;
@@ -404,7 +432,7 @@ async function initBrowser() {
         sessionRestartTimer = null;
       }
       
-      console.log(`\x1b[31m[Bet Module] Browser closed or crashed. Relaunching...\x1b[0m`);
+      console.log(`\x1b[31m[Bet Module] Browser closed or crashed. Relaunching next account...\x1b[0m`);
       if (!isIntentionalRestart) {
         sendWhatsAppNotification(
           `[RECOVERY] Bet module "${currentAccountLabel}" relaunching. Reason: Browser tab was closed unexpectedly.`
@@ -415,8 +443,10 @@ async function initBrowser() {
       isBrowserReady = false;
       browserPage = null;
       browserInstance = null;
-      // Disconnect puppeteer from the browser (Chrome stays alive if session restart)
-      if (browserContext) await browserContext.disconnect().catch(() => {});
+      // Close browser completely on session end or closed/crashed
+      if (browserContext) await browserContext.close().catch(() => {});
+      
+      advanceToNextAccount();
     } catch (err) {
       console.error("\x1b[31m[Bet Module] Launch error:\x1b[0m", err.message);
       if (!isIntentionalRestart) {
@@ -433,7 +463,9 @@ async function initBrowser() {
         clearInterval(sessionRestartTimer);
         sessionRestartTimer = null;
       }
-      if (browserContext) await browserContext.disconnect().catch(() => {});
+      if (browserContext) await browserContext.close().catch(() => {});
+      
+      advanceToNextAccount();
       await new Promise(r => setTimeout(r, 5000));
     }
   }
@@ -448,7 +480,7 @@ server.on('error', (err) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`[Bet Module] 🟢 Online on ${BASE_URL} | Account Index: ${ACCOUNT_INDEX} | Targeting Central: ${CENTRAL_URL}`);
+  console.log(`[Bet Module] 🟢 Online on ${BASE_URL} | Account Index: ${currentAccountIndex} | Targeting Central: ${CENTRAL_URL}`);
   setInterval(sendHeartbeat, 5000);
   setInterval(updateBalance, 5000); // Check balance periodically
   sendHeartbeat(); // initial heartbeat
