@@ -186,4 +186,119 @@ async function runEventBasedEyes(pageRef, extractorCode, acctConfig) {
   return false;
 }
 
+// ─── Local Loopback IPC Server ──────────────────────────────────────────
+const http = require("http");
+
+function startLoopbackServer() {
+  const server = http.createServer(async (req, res) => {
+    if (req.method === "POST" && req.url === "/reset-all") {
+      try {
+        console.log("[IPC] Received manual /reset-all request from dashboard.");
+
+        for (const ts of stateManager.tables.values()) {
+          stateManager._resetShoe(ts, "Manual reset all from dashboard via loopback");
+        }
+
+        saveState(stateManager, eventLog);
+
+        // Immediate push update to dashboard
+        const allTables = Array.from(latestScrapedTables.values());
+        const { ignoredTables, config: dynamicConfig } = config.getDynamicConfig();
+        const timestamp = new Date().toISOString().replace(/:/g, "-").split(".")[0];
+
+        await writeDashboardJson(
+          allTables,
+          stateManager,
+          timestamp,
+          [],
+          Array.from(latestScrapedTables.keys()),
+          ignoredTables,
+          dynamicConfig,
+          eventLog
+        );
+
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true, message: "All tables successfully reset in memory" }));
+      } catch (err) {
+        console.error("[IPC] Failed to reset all tables:", err.message);
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: err.message }));
+      }
+      return;
+    }
+
+    if (req.method === "POST" && req.url.startsWith("/reset?")) {
+      try {
+        const url = new URL(req.url, "http://localhost");
+        const tableName = url.searchParams.get("table");
+
+        if (!tableName) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "Missing table param" }));
+          return;
+        }
+
+        console.log(`[IPC] Received manual /reset request for table ${tableName} from dashboard.`);
+
+        const ts = stateManager.getTable(tableName);
+        if (!ts) {
+          res.writeHead(404, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: `Table ${tableName} not found in stateManager` }));
+          return;
+        }
+
+        stateManager._resetShoe(ts, "Manual reset from dashboard via loopback");
+        saveState(stateManager, eventLog);
+
+        // Immediate push update to dashboard
+        const allTables = Array.from(latestScrapedTables.values());
+        const { ignoredTables, config: dynamicConfig } = config.getDynamicConfig();
+        const timestamp = new Date().toISOString().replace(/:/g, "-").split(".")[0];
+
+        await writeDashboardJson(
+          allTables,
+          stateManager,
+          timestamp,
+          [],
+          Array.from(latestScrapedTables.keys()),
+          ignoredTables,
+          dynamicConfig,
+          eventLog
+        );
+
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true, table: tableName, deckRemaining: ts.remaining }));
+      } catch (err) {
+        console.error("[IPC] Failed to reset table:", err.message);
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: err.message }));
+      }
+      return;
+    }
+
+    res.writeHead(404);
+    res.end("Not found");
+  });
+
+  const IPC_PORT = 3455;
+  server.listen(IPC_PORT, "127.0.0.1", () => {
+    console.log(`[IPC] Loopback server listening on http://127.0.0.1:${IPC_PORT}`);
+  });
+
+  server.on("error", (err) => {
+    if (err.code === "EADDRINUSE") {
+      console.warn(`[IPC] Port ${IPC_PORT} already in use, loopback server might be already running.`);
+    } else {
+      console.error("[IPC] Server error:", err.message);
+    }
+  });
+
+  // Graceful shutdown
+  process.on("SIGINT", () => { server.close(() => {}); });
+  process.on("SIGTERM", () => { server.close(() => {}); });
+}
+
+// Start loopback server immediately on module load
+startLoopbackServer();
+
 module.exports = { runEventBasedEyes, stateManager };

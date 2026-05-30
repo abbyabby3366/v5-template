@@ -32,46 +32,7 @@
     return null;
   }
 
-  function getRoundCount(roomId, packet) {
-    try {
-      let pinia = window.$nuxt?.$pinia || window.$pinia;
-      if (!pinia) {
-        const el = document.querySelector('#__nuxt') || document.querySelector('#app') || document.body;
-        pinia = el?.__vue_app__?.$pinia || el?.__vue_app__?.config?.globalProperties?.$pinia;
-      }
-      if (!pinia && window.$pinia) {
-        pinia = window.$pinia;
-      }
 
-      if (pinia && pinia.state && pinia.state.value) {
-        for (const storeKey of Object.keys(pinia.state.value)) {
-          if (storeKey.toLowerCase().includes('baccarat')) {
-            const storeState = pinia.state.value[storeKey];
-            if (storeState) {
-              if (Array.isArray(storeState.bacTable)) {
-                const tbl = storeState.bacTable.find(t => t.roomId === roomId);
-                if (tbl && tbl.statistics) {
-                  return tbl.statistics.length;
-                }
-              }
-              if (Array.isArray(storeState.dtTable)) {
-                const tbl = storeState.dtTable.find(t => t.roomId === roomId);
-                if (tbl && tbl.statistics) {
-                  return tbl.statistics.length;
-                }
-              }
-            }
-          }
-        }
-      }
-    } catch (e) { }
-
-    if (packet) {
-      const stats = packet.statistics || [];
-      if (stats.length) return stats.length;
-    }
-    return 0;
-  }
 
   async function loadLobbyMapping() {
     try {
@@ -89,8 +50,7 @@
           if (t.isActive === true) {
             window.__activeRooms.add(t.roomId);
             if (!window.__tableStatesCache[t.roomId]) {
-              const baseStoreCount = t.statistics ? t.statistics.length : 0;
-              const roundCount = t.round || t.roundNo || t.roundNumber || baseStoreCount;
+              const roundCount = t.round || t.roundNo || t.roundNumber || null;
               const tGameId = t.gameId || "N/A";
               window.__tableStatesCache[t.roomId] = {
                 roomId: t.roomId,
@@ -300,9 +260,7 @@
     const statusChanged = packet.status !== old.status;
 
     const gameId = packet.gameId || old.gameId || "N/A";
-    const baseStoreCount = getRoundCount(packet.roomId, packet);
-
-    const roundCount = packet.round || packet.roundNo || packet.roundNumber || baseStoreCount;
+    const roundCount = packet.round || packet.roundNo || packet.roundNumber || null;
 
     const isNewRound = (gameId !== "N/A" && old.gameId !== undefined && old.gameId !== "N/A" && gameId !== old.gameId) ||
                        (statusChanged && packet.status === "CountDown");

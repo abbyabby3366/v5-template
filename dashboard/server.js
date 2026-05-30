@@ -37,6 +37,7 @@ const PORT = 3456;
 const ROOT = path.join(__dirname, "..");
 
 let _stateManager = null;
+let latestStateInMemory = null;
 const betLog = [];
 const centralBetQueue = [];
 const MAX_BET_LOG = 1000;
@@ -655,6 +656,19 @@ function startDashboard(stateManager) {
       return;
     }
 
+    if (req.method === "POST" && req.url.startsWith("/api/telemetry/state")) {
+      try {
+        const body = await parseJSONBody(req);
+        latestStateInMemory = body;
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true }));
+      } catch (e) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: false, error: e.message }));
+      }
+      return;
+    }
+
     if (req.method === "POST" && req.url.startsWith("/api/telemetry/eyes")) {
       try {
         const body = await parseJSONBody(req);
@@ -1032,8 +1046,22 @@ function startDashboard(stateManager) {
 
     if (req.method === "POST" && req.url === "/reset-all") {
       if (!_stateManager) {
-        res.writeHead(400, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: "No state manager" }));
+        try {
+          const resp = await fetch("http://127.0.0.1:3455/reset-all", { method: "POST" });
+          if (!resp.ok) {
+            let errMsg = `HTTP ${resp.status}`;
+            try { const body = await resp.json(); errMsg = body.error || errMsg; } catch (e) {}
+            res.writeHead(resp.status, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: `Forwarding failed: ${errMsg}` }));
+            return;
+          }
+          const data = await resp.json();
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify(data));
+        } catch (err) {
+          res.writeHead(503, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: `Eyes client offline or unreachable: ${err.message}` }));
+        }
         return;
       }
       for (const ts of _stateManager.tables.values()) {
@@ -1052,9 +1080,29 @@ function startDashboard(stateManager) {
       const url = new URL(req.url, `http://localhost:${PORT}`);
       const tableName = url.searchParams.get("table");
 
-      if (!tableName || !_stateManager) {
+      if (!tableName) {
         res.writeHead(400, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: "Missing table param" }));
+        return;
+      }
+
+      if (!_stateManager) {
+        try {
+          const resp = await fetch(`http://127.0.0.1:3455/reset?table=${encodeURIComponent(tableName)}`, { method: "POST" });
+          if (!resp.ok) {
+            let errMsg = `HTTP ${resp.status}`;
+            try { const body = await resp.json(); errMsg = body.error || errMsg; } catch (e) {}
+            res.writeHead(resp.status, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: `Forwarding failed: ${errMsg}` }));
+            return;
+          }
+          const data = await resp.json();
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify(data));
+        } catch (err) {
+          res.writeHead(503, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: `Eyes client offline or unreachable: ${err.message}` }));
+        }
         return;
       }
 
@@ -1072,6 +1120,17 @@ function startDashboard(stateManager) {
     }
 
     // GET routes
+    if (req.url.startsWith("/tables_state.json")) {
+      if (latestStateInMemory) {
+        res.writeHead(200, {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-cache"
+        });
+        res.end(JSON.stringify(latestStateInMemory));
+        return;
+      }
+    }
+
     let filePath;
     if (req.url === "/" || req.url === "/index.html") {
       filePath = path.join(__dirname, "index.html");

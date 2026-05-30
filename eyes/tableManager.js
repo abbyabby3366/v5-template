@@ -125,6 +125,15 @@ class TableStateManager {
 
 
 
+      // Zero-tolerance guard for missing or invalid round number from source
+      if (newState !== "Shuffling" && (!newRound || isNaN(newRound) || newRound <= 0)) {
+        const errMsg = `[ERROR] ${name}: Missing or invalid round number from source! (Got: ${newRound})`;
+        console.error(`\x1b[31m${errMsg}\x1b[0m`);
+        sendWhatsAppNotification(errMsg).catch(err => console.error("WhatsApp Notification failed:", err));
+        this.#resetShoe(ts, `Invalid state: round number is missing or 0`);
+        continue;
+      }
+
       // 1. Handle stale restored state
       const staleReason = checkStaleRestoredState(ts, newRound);
       if (ts.restored) ts.restored = false;

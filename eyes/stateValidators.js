@@ -144,7 +144,9 @@ function isInvalidStateReset(reason) {
 function checkStaleRestoredState(ts, newRound) {
   if (ts.restored) {
     const roundDrop = newRound < ts.round;
-    if (roundDrop) {
+    // Only flag as stale if newRound is a valid positive round number (e.g., > 0).
+    // Drops to 0/null are expected when a new shoe starts or is shuffling.
+    if (roundDrop && newRound > 0) {
       return `Invalid state: Stale state restored (saved R${ts.round} -> live R${newRound})`;
     }
   }

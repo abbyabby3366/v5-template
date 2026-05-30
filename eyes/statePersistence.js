@@ -137,32 +137,36 @@ async function writeDashboardJson(tables, stateManager, timestamp, events, allSc
     ...(e.reason ? { reason: e.reason } : {}),
   }));
 
+  const payload = {
+    timestamp,
+    totalTables: stateSnapshot.length,
+    config: {
+      minEvThreshold: dynamicConfig.minEvThreshold !== undefined ? parseFloat(dynamicConfig.minEvThreshold) : 0.0003,
+      rebateRate: dynamicConfig.rebateRate !== undefined ? parseFloat(dynamicConfig.rebateRate) : 0.012,
+    },
+    allScrapedTables,
+    ignoredTables,
+    eventsThisTick: eventsSummary,
+    eventLog: eventLog,
+    tables: stateSnapshot,
+  };
+
   try {
     const tmpFile = DASHBOARD_FILE + ".tmp";
-    fs.writeFileSync(
-      tmpFile,
-      JSON.stringify(
-        {
-          timestamp,
-          totalTables: stateSnapshot.length,
-          config: {
-            minEvThreshold: dynamicConfig.minEvThreshold !== undefined ? parseFloat(dynamicConfig.minEvThreshold) : 0.0003,
-            rebateRate: dynamicConfig.rebateRate !== undefined ? parseFloat(dynamicConfig.rebateRate) : 0.012,
-          },
-          allScrapedTables,
-          ignoredTables,
-          eventsThisTick: eventsSummary,
-          eventLog: eventLog,
-          tables: stateSnapshot,
-        },
-        null,
-        2
-      )
-    );
+    fs.writeFileSync(tmpFile, JSON.stringify(payload, null, 2));
     safeRename(tmpFile, DASHBOARD_FILE);
   } catch (e) {
     console.error(`[STATE] Failed to write tables_state.json: ${e.message}`);
   }
+
+  // Push to Central Server in-memory cache
+  fetch("http://localhost:3456/api/telemetry/state", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  }).catch(() => {
+    // Quietly ignore if central server is offline
+  });
 }
 
 module.exports = {
