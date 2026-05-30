@@ -455,14 +455,25 @@ function startDashboard(stateManager) {
 
   })();
 
-  async function compileStatsJSON(range = "all_time") {
+  async function compileStatsJSON(range = "all_time", from = null, to = null) {
     if (!dbCollection) throw new Error("DB not connected");
 
     let startStr = null;
     let endStr = null;
     let dateInfo = "All Time";
 
-    if (range !== "all_time") {
+    if (range === "custom") {
+      if (from) {
+        startStr = new Date(from).toISOString();
+      }
+      if (to) {
+        endStr = new Date(to).toISOString();
+      }
+      const options = { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true };
+      const fromStr = from ? new Date(from).toLocaleString('en-GB', options) : "Beginning";
+      const toStr = to ? new Date(to).toLocaleString('en-GB', options) : "End";
+      dateInfo = `Custom: ${fromStr} to ${toStr}`;
+    } else if (range !== "all_time") {
       const now = new Date();
       const today12pm = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0, 0);
       let currentPeriodStart = new Date(today12pm);
@@ -497,8 +508,10 @@ function startDashboard(stateManager) {
     }
 
     const matchQ = { outcome: { $in: ["SUCCESS", "WRONG_AMOUNT"] } };
-    if (startStr && endStr) {
-      matchQ.time = { $gte: startStr, $lt: endStr };
+    if (startStr || endStr) {
+      matchQ.time = {};
+      if (startStr) matchQ.time.$gte = startStr;
+      if (endStr) matchQ.time.$lt = endStr;
     }
 
     const bets = await dbCollection.find(matchQ).toArray();
@@ -933,7 +946,9 @@ function startDashboard(stateManager) {
       try {
         const url = new URL(req.url, `http://localhost:${PORT}`);
         const range = url.searchParams.get("range") || "all_time";
-        const result = await compileStatsJSON(range);
+        const from = url.searchParams.get("from");
+        const to = url.searchParams.get("to");
+        const result = await compileStatsJSON(range, from, to);
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify(result));
       } catch (e) {

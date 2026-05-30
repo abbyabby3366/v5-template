@@ -23,14 +23,35 @@
 
     .main{flex:1;overflow-y:auto;padding:20px;}
     
-    .btn { padding:6px 12px; border:none; border-radius:4px; cursor:pointer; font-family:inherit; font-weight:600; }
+    .btn { padding:6px 12px; border:none; border-radius:4px; cursor:pointer; font-family:inherit; font-weight:600; transition: all 0.2s; }
     .btn-secondary { background:#0d1117; color:var(--text); border:1px solid var(--border); }
     .btn-secondary:hover { background:var(--card); }
+    .btn-secondary.active { border-color:var(--cyan); color:var(--cyan); background:rgba(57,197,207,0.1); }
 
     .table-container { width:100%; overflow-x:auto; background:#0d1117; border:1px solid var(--border); border-radius:4px; margin-top: 15px; }
     table { width:100%; min-width:800px; border-collapse:collapse; white-space:nowrap; }
     th, td { padding:8px 10px; border-bottom:1px solid rgba(255,255,255,0.05); }
     th { color:var(--dim); font-weight:600; text-transform:uppercase; text-align:left; background:#0a0c10; position:sticky; top:0; z-index:2; }
+
+    input[type="datetime-local"] {
+      background:#161b22;
+      color:var(--text);
+      border:1px solid var(--border);
+      padding:4px 8px;
+      border-radius:3px;
+      font-family:inherit;
+      font-size:11px;
+      outline:none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    input[type="datetime-local"]:focus {
+      border-color: var(--cyan);
+      box-shadow: 0 0 0 2px rgba(57,197,207,0.15);
+    }
+    input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+      filter: invert(0.8) sepia(50%) saturate(1000%) hue-rotate(140deg);
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -43,11 +64,19 @@
   </div>
   
   <div class="main">
-    <div style="display:flex; gap:10px; margin-bottom:15px; flex-wrap:wrap;">
-       <button onclick="loadStats('today')" class="btn btn-secondary">Today</button>
-       <button onclick="loadStats('yesterday')" class="btn btn-secondary">Yesterday</button>
-       <button onclick="loadStats('last_7_days')" class="btn btn-secondary">Last 7 Days</button>
-       <button onclick="loadStats('all_time')" class="btn btn-secondary">All Time</button>
+    <div style="display:flex; gap:10px; margin-bottom:15px; flex-wrap:wrap; align-items:center;">
+       <button id="btn-today" onclick="selectRange('today', this)" class="btn btn-secondary active">Today</button>
+       <button id="btn-yesterday" onclick="selectRange('yesterday', this)" class="btn btn-secondary">Yesterday</button>
+       <button id="btn-last_7_days" onclick="selectRange('last_7_days', this)" class="btn btn-secondary">Last 7 Days</button>
+       <button id="btn-all_time" onclick="selectRange('all_time', this)" class="btn btn-secondary">All Time</button>
+       <button id="btn-custom" onclick="selectRange('custom', this)" class="btn btn-secondary">Custom</button>
+       
+       <div id="custom-range-container" style="display:none; align-items:center; gap:8px; border:1px solid var(--border); padding:4px 8px; border-radius:4px; background:#0d1117; margin-left:10px; flex-wrap:wrap;">
+         <input type="datetime-local" id="custom-from" />
+         <span style="color:var(--dim);">to</span>
+         <input type="datetime-local" id="custom-to" />
+         <button id="btn-apply" onclick="loadStats('custom')" class="btn btn-secondary" style="border-color:var(--cyan); color:var(--cyan); background:rgba(57,197,207,0.05); padding:4px 10px;">Apply</button>
+       </div>
     </div>
     <div id="stats-date-info" style="color:var(--yellow); font-size:11px; margin-bottom:10px; font-weight:600;"></div>
     
@@ -57,11 +86,70 @@
   </div>
 
   <script>
+    function selectBtn(el) {
+      document.querySelectorAll('.btn-secondary').forEach(btn => btn.classList.remove('active'));
+      if (el) el.classList.add('active');
+    }
+
+    function toggleCustomRange(show) {
+      const container = document.getElementById('custom-range-container');
+      if (show) {
+        container.style.display = 'flex';
+      } else {
+        container.style.display = 'none';
+      }
+    }
+
+    function selectRange(range, btnEl) {
+      selectBtn(btnEl);
+      if (range === 'custom') {
+        toggleCustomRange(true);
+      } else {
+        toggleCustomRange(false);
+      }
+      loadStats(range);
+    }
+
+    function initCustomDateInputs() {
+      const now = new Date();
+      
+      // Calculate today's 12pm start (similar to server logic)
+      const today12pm = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0, 0);
+      let currentPeriodStart = new Date(today12pm);
+      if (now < today12pm) {
+        currentPeriodStart.setDate(currentPeriodStart.getDate() - 1);
+      }
+      
+      // Format as YYYY-MM-DDTHH:MM for datetime-local
+      const toLocalISO = (date) => {
+        const offset = date.getTimezoneOffset();
+        const localDate = new Date(date.getTime() - (offset * 60 * 1000));
+        return localDate.toISOString().slice(0, 16);
+      };
+      
+      document.getElementById('custom-from').value = toLocalISO(currentPeriodStart);
+      document.getElementById('custom-to').value = toLocalISO(now);
+    }
+
     async function loadStats(range = 'today') {
       document.getElementById('stats-content').innerHTML = '<div style="padding:20px; color:var(--dim); text-align:center;">Loading stats from database...</div>';
       document.getElementById('stats-date-info').textContent = 'Loading range...';
       try {
-        const res = await fetch(`/api/stats?range=${range}`);
+        let url = `/api/stats?range=${range}`;
+        if (range === 'custom') {
+          const fromVal = document.getElementById('custom-from').value;
+          const toVal = document.getElementById('custom-to').value;
+          if (!fromVal || !toVal) {
+            document.getElementById('stats-content').innerHTML = '<div style="color:var(--red); padding:20px;">Please select both start and end date/time.</div>';
+            document.getElementById('stats-date-info').textContent = 'Invalid custom range';
+            return;
+          }
+          const fromISO = new Date(fromVal).toISOString();
+          const toISO = new Date(toVal).toISOString();
+          url += `&from=${encodeURIComponent(fromISO)}&to=${encodeURIComponent(toISO)}`;
+        }
+        
+        const res = await fetch(url);
         const data = await res.json();
         if (data.ok) {
            document.getElementById('stats-date-info').textContent = data.dateInfo;
@@ -119,7 +207,9 @@
        `;
     }
 
-    loadStats();
+    // Initialize custom date-time inputs and load today's stats on start
+    initCustomDateInputs();
+    loadStats('today');
   </script>
 </body>
 </html>
