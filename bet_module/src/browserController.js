@@ -47,6 +47,36 @@ class BrowserController {
       console.error("[Browser] Failed to write login timestamp:", e.message);
     }
 
+    // Clean up any remaining other Chrome instances before launching
+    try {
+      const puppeteer = require("puppeteer");
+      const accountsFile = path.resolve(__dirname, "..", "json", "bet_accounts.json");
+      if (fs.existsSync(accountsFile)) {
+        const accounts = JSON.parse(fs.readFileSync(accountsFile, "utf8"));
+        for (const acct of accounts) {
+          const port = acct.debuggingPort;
+          if (port && port !== acctConfig.chrome.remoteDebuggingPort) {
+            try {
+              console.log(`[Browser] Checking if a stale Chrome is running on port ${port} to clean it up...`);
+              const staleBrowser = await Promise.race([
+                puppeteer.connect({ browserURL: `http://127.0.0.1:${port}`, defaultViewport: null }),
+                new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 1500))
+              ]);
+              console.log(`[Browser] Found stale Chrome on port ${port}. Shutting it down...`);
+              await Promise.race([
+                staleBrowser.close(),
+                new Promise(r => setTimeout(r, 3000))
+              ]).catch(() => {});
+            } catch (e) {
+              // No stale browser running on this port, ignore
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error("[Browser] Stale Chrome cleanup warning:", err.message);
+    }
+
     console.log(`\n[Browser] Starting winbox browser sequence for ${acctConfig.label}...`);
     const { browser, page } = await launchAccount(acctConfig);
 
