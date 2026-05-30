@@ -148,8 +148,8 @@ class SessionManager {
         this.rotator.advanceToNext();
       } catch (err) {
         console.error("\x1b[31m[Bet Module] Lifecycle error:\x1b[0m", err.message);
+        const acctConfig = this.rotator.getCurrentConfig();
         if (!this.isIntentionalRestart) {
-          const acctConfig = this.rotator.getCurrentConfig();
           this.telemetry.notifyAlert(
             `[RECOVERY] Bet module "${acctConfig.label}" failed and is relaunching. Reason: ${err.message}`
           ).catch(() => {});
