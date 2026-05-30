@@ -33,9 +33,6 @@ function checkShoeResetNeeded(ts, newRound, newState, statistics) {
   if (newRound === 1 && ts.round > 1) {
     return { forceReset: true, resetReason: `Round number decreased from ${ts.round} to 1` };
   }
-  if (statistics && statistics.length === 0 && ts.round > 1 && newState !== "Shuffling") {
-    return { forceReset: true, resetReason: "Shuffling detected" };
-  }
   return { forceReset: false, resetReason: "" };
 }
 

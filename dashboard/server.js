@@ -816,7 +816,7 @@ function startDashboard(stateManager) {
             id: "shuffle_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5),
             time: new Date().toISOString(),
             tableName: body.tableName,
-            reason: body.reason || "Shuffling detected",
+            reason: body.reason || "New shoe detected",
             finalRound: body.finalRound || 0
           };
           dbCollectionShuffles.insertOne(shuffleEntry).catch(() => { });
