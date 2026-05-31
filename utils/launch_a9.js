@@ -131,7 +131,7 @@ function buildAccountConfig(accountIndex, accountsFilePath) {
   const port = account.debuggingPort ?? basePort + accountIndex;
   
   const rawProxy = account.proxy || {};
-  const useProxy = account.useProxy !== undefined ? account.useProxy : !!rawProxy.server;
+  const useProxy = !!account.useProxy;
 
   return {
     accountIndex,
@@ -146,6 +146,7 @@ function buildAccountConfig(accountIndex, accountsFilePath) {
       remoteDebuggingPort: port,
       extraArgs: getBrowserArgs() || [],
     },
+    useProxy,
     proxy: useProxy ? rawProxy : {},
     credentials: account.credentials || {},
     urls: URLS,
@@ -156,7 +157,7 @@ function buildAccountConfig(accountIndex, accountsFilePath) {
 }
 
 async function launchAccount(acctConfig) {
-  const { chrome, proxy, credentials, urls, selectors, timeouts } = acctConfig;
+  const { chrome, useProxy, proxy, credentials, urls, selectors, timeouts } = acctConfig;
   const labelPrefix = acctConfig.label || "Account";
   const logger = {
     label: labelPrefix,
@@ -164,6 +165,54 @@ async function launchAccount(acctConfig) {
     warn: (msg) => console.warn(`[${labelPrefix}] ${msg}`),
     error: (msg) => console.error(`[${labelPrefix}] ${msg}`),
   };
+
+  // --- EMBEDDED TAILSCALE PROXY HANDLING ---
+  let tscProxy = null;
+  if (proxy && proxy.type === "tailscale") {
+    logger.log("Initializing embedded Tailscale node...");
+    try {
+      const { TSCProxy } = require("@tailscale/tscproxy");
+      const port = proxy.port || 1055;
+      const hostname = proxy.hostname || `puppeteer-${labelPrefix.replace(/\s+/g, '-').toLowerCase()}`;
+      tscProxy = await TSCProxy.start({
+        authKey: proxy.authKey,
+        hostname,
+        socks5Addr: `127.0.0.1:${port}`,
+        args: proxy.exitNode ? [`--exit-node=${proxy.exitNode}`] : []
+      });
+      logger.log(`Tailscale proxy successfully started on socks5://127.0.0.1:${port}`);
+      proxy.server = `socks5://127.0.0.1:${port}`;
+    } catch (err) {
+      logger.error(`Failed to start Tailscale proxy: ${err.message}`);
+      throw err;
+    }
+  }
+
+  // --- PROXY COMMAND-LINE ARGUMENT FORMATTING ---
+  let formattedProxy = "";
+  if (proxy && proxy.server) {
+    let proxyUrl = proxy.server;
+    let scheme = "";
+    
+    // Extract protocol scheme if present (e.g., http://, socks5://)
+    const schemeMatch = proxyUrl.match(/^([a-zA-Z0-9+.-]+:\/\/)/);
+    if (schemeMatch) {
+      scheme = schemeMatch[1];
+      proxyUrl = proxyUrl.substring(scheme.length);
+    }
+    
+    // Handle wrapping of raw IPv6 hosts with port numbers in brackets
+    if (proxyUrl.includes(":") && proxyUrl.split(":").length > 2 && !proxyUrl.startsWith("[")) {
+      const lastColon = proxyUrl.lastIndexOf(":");
+      const host = proxyUrl.substring(0, lastColon);
+      const portPart = proxyUrl.substring(lastColon);
+      if (/^:\d+$/.test(portPart)) {
+        proxyUrl = `[${host}]${portPart}`;
+      }
+    }
+    
+    formattedProxy = scheme + proxyUrl;
+  }
 
   async function applyProxyAuth(p) {
     if (proxy && proxy.server && proxy.username && proxy.password) {
@@ -195,14 +244,7 @@ async function launchAccount(acctConfig) {
       "--force-device-scale-factor=1", "--high-dpi-support=1",
       ...(chrome.extraArgs || []),
     ];
-    if (proxy && proxy.server) {
-      let formattedProxy = proxy.server;
-      if (formattedProxy.includes(":") && formattedProxy.split(":").length > 2 && !formattedProxy.startsWith("[")) {
-        const lastColon = formattedProxy.lastIndexOf(":");
-        const host = formattedProxy.substring(0, lastColon);
-        const portPart = formattedProxy.substring(lastColon);
-        if (/^:\d+$/.test(portPart)) formattedProxy = `[${host}]${portPart}`;
-      }
+    if (formattedProxy) {
       chromeArgs.push(`--proxy-server=${formattedProxy}`);
     }
 
@@ -232,6 +274,97 @@ async function launchAccount(acctConfig) {
       }
     }
     if (!connected) throw new Error("Failed to connect to Chrome after 5 attempts.");
+  }
+
+  // --- TAILSCALE LIFECYCLE HOOK ---
+  if (browser && tscProxy) {
+    browser.tscProxy = tscProxy;
+    browser.on('disconnected', async () => {
+      logger.log("Browser disconnected, shutting down Tailscale proxy...");
+      await tscProxy.close().catch(() => {});
+    });
+  }
+
+  // --- GLOBAL EVENT-DRIVEN PROXY AUTHENTICATION ---
+  if (browser && proxy && proxy.server && proxy.username && proxy.password) {
+    logger.log("Setting up global proxy authentication listener...");
+    
+    // 1. Authenticate existing pages/tabs
+    const pages = await browser.pages().catch(() => []);
+    for (const p of pages) {
+      await p.authenticate({ username: proxy.username, password: proxy.password })
+        .catch((e) => logger.warn(`Proxy authentication failed on existing page: ${e.message}`));
+    }
+
+    // 2. Authenticate newly created pages/tabs dynamically
+    browser.on('targetcreated', async (target) => {
+      if (target.type() === 'page') {
+        try {
+          const p = await target.page();
+          if (p) {
+            await p.authenticate({ username: proxy.username, password: proxy.password })
+              .catch((e) => logger.warn(`Proxy authentication failed on new page: ${e.message}`));
+          }
+        } catch (e) {
+          // Ignore
+        }
+      }
+    });
+  }
+
+  // --- VERIFY EXTERNAL PROXY IP ---
+  if (useProxy) {
+    logger.log("🌐 Verifying external IP address and routing via proxy...");
+    let tempPage = null;
+    try {
+      tempPage = await browser.newPage();
+      if (proxy && proxy.username && proxy.password) {
+        await tempPage.authenticate({ username: proxy.username, password: proxy.password }).catch(() => {});
+      }
+
+      const reflectionServers = [
+        { url: "https://httpbin.org/ip", key: "origin" },
+        { url: "https://api.ipify.org?format=json", key: "ip" },
+        { url: "https://ipinfo.io/json", key: "ip" }
+      ];
+
+      let ipVerified = false;
+      for (const server of reflectionServers) {
+        try {
+          await tempPage.goto(server.url, { waitUntil: "networkidle2", timeout: 10000 });
+          const responseText = await tempPage.evaluate(() => document.body.innerText || document.body.textContent || "");
+          const cleanedText = responseText.trim();
+          
+          let ip = "";
+          try {
+            const data = JSON.parse(cleanedText);
+            ip = data[server.key] || data.ip || data.origin || "";
+          } catch (e) {
+            // Regex fallback if JSON parsing fails due to browser pre/code tags wrapping
+            const match = responseText.match(/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/);
+            if (match) ip = match[0];
+          }
+
+          if (ip) {
+            console.log(`\n🎉 PROXY CONNECTED! Current Public IP: \x1b[36m${ip}\x1b[0m (via ${new URL(server.url).hostname})\n`);
+            ipVerified = true;
+            break;
+          }
+        } catch (err) {
+          logger.warn(`⚠️ Reflection server ${server.url} failed: ${err.message}. Trying fallback...`);
+        }
+      }
+
+      if (!ipVerified) {
+        logger.warn("⚠️ Warning: Failed to verify external IP across all reflection fallback servers.");
+      }
+    } catch (err) {
+      logger.warn(`⚠️ Warning: Error setting up IP verification page: ${err.message}`);
+    } finally {
+      if (tempPage) {
+        await tempPage.close().catch(() => {});
+      }
+    }
   }
 
   const STATES = { IN_GAME: "IN_GAME", A9_DASHBOARD: "A9_DASHBOARD", OTP_REQUIRED: "OTP_REQUIRED", A9_LOGIN: "A9_LOGIN", UNINITIALIZED: "UNINITIALIZED" };

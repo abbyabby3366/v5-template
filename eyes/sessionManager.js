@@ -82,7 +82,7 @@ function setupSessionRestart(browserContext, pageRef, acctConfig, onBeforeSwap) 
     if (isHippoOrDirect && browserContext) {
       console.log(`[Session Restart] Performing SEAMLESS restart for Hippo... Preparing new page in background.`);
       try {
-        const newPage = await loginToDemo(browserContext);
+        const newPage = await loginToDemo(browserContext, acctConfig.proxy);
         console.log(`[Session Restart] New page fully loaded and prepared. Swapping seamlessly!`);
         
         const oldPage = pageRef.current;

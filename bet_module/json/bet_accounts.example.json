@@ -1,30 +1,62 @@
 [
   {
-    "label": "PG Bet Winbox 1",
+    "label": "PG Bet Winbox 1 (Conventional Proxy)",
     "platform": "winbox",
     "launchMethod": "connect",
     "enableDomCleanup": false,
     "profileIndex": 12,
     "debuggingPort": 12323,
     "sessionRestartMinutes": 120,
-    "run": true,
+    "run": false,
+    "useProxy": true,
+    "proxy": {
+      "server": "http://157.22.122.254:63224",
+      "username": "mrPLFVKp",
+      "password": "CKb9aYcJ"
+    },
     "credentials": {
       "email": "YOUR_EMAIL_1",
       "password": "YOUR_PASSWORD_1"
     }
   },
   {
-    "label": "PG Bet Winbox 2",
+    "label": "PG Bet Winbox 2 (Self-Hosted Gluetun / CyberGhost / Mullvad Proxy)",
     "platform": "winbox",
     "launchMethod": "connect",
     "enableDomCleanup": false,
     "profileIndex": 13,
     "debuggingPort": 12324,
     "sessionRestartMinutes": 120,
-    "run": true,
+    "run": false,
+    "useProxy": true,
+    "proxy": {
+      "server": "http://127.0.0.1:8340"
+    },
     "credentials": {
       "email": "YOUR_EMAIL_2",
       "password": "YOUR_PASSWORD_2"
+    }
+  },
+  {
+    "label": "PG Bet Winbox 3 (Tailscale exit-node SOCKS5 Proxy)",
+    "platform": "winbox",
+    "launchMethod": "connect",
+    "enableDomCleanup": false,
+    "profileIndex": 14,
+    "debuggingPort": 12325,
+    "sessionRestartMinutes": 120,
+    "run": false,
+    "useProxy": true,
+    "proxy": {
+      "type": "tailscale",
+      "authKey": "tskey-auth-kQNCthGV4411CNTRL-997zmxgQigRCsLJebAyAgRduZMTJgYVp8",
+      "exitNode": "100.93.45.67",
+      "port": 1055,
+      "hostname": "puppeteer-bot"
+    },
+    "credentials": {
+      "email": "YOUR_EMAIL_3",
+      "password": "YOUR_PASSWORD_3"
     }
   }
 ]
