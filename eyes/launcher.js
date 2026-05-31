@@ -63,7 +63,8 @@ async function start() {
       if (acctConfig && acctConfig.isPlannedRestart) {
         console.log(`[Launcher] Planned restart active. Rebuilding browser session...`);
       } else {
-        sendWhatsAppNotification(`[RECOVERY] Eyes module "${acctConfig.label}" relaunching. Reason: Page closed or loop exited.`)
+        const reason = pageRef.current?.closeReason || "Page closed or loop exited.";
+        sendWhatsAppNotification(`[RECOVERY] Eyes module "${acctConfig.label}" relaunching. Reason: ${reason}`)
           .catch(err => console.error("Notification failed:", err.message));
       }
 

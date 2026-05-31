@@ -9,7 +9,7 @@ const path = require("path");
 const fs = require("fs");
 const { spawn } = require("child_process");
 const { getBrowserArgs } = require("./browserArgs");
-const { checkPageErrors } = require("./check_page_interval");
+const { verifyProxyIp } = require("./proxy_verifier");
 
 const LOGIN_TIMESTAMPS_FILE = path.resolve(__dirname, "login_timestamps.json");
 function readLoginTimestamps() {
@@ -40,6 +40,105 @@ const TIMEOUTS = {
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Perform a single immediate check (or quick wait) on the page for error overlays
+ * and dismiss them. Helpful right after launch/navigation.
+ * 
+ * @param {import('puppeteer').Page} page
+ * @param {Object} logger
+ */
+async function checkPageErrors(page, logger = console) {
+  try {
+    const errorState = await page.evaluate(() => {
+      const selectors = [
+        ".el-message-box",
+        ".swal2-container",
+        ".swal-modal",
+        ".modal-dialog",
+        ".dialog-container",
+        ".popup-box",
+        ".EmailVerificationRoot"
+      ];
+
+      let foundBox = null;
+      let boxText = "";
+
+      for (const selector of selectors) {
+        const el = document.querySelector(selector);
+        if (el) {
+          const rect = el.getBoundingClientRect();
+          const style = window.getComputedStyle(el);
+          const isVisible = rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
+          if (isVisible) {
+            foundBox = el;
+            boxText = el.innerText || "";
+            break;
+          }
+        }
+      }
+
+      if (foundBox) {
+        const lowerText = boxText.toLowerCase();
+        const errorPatterns = [
+          "session timeout",
+          "access denied",
+          "another device",
+          "logged out",
+          "kick out",
+          "please login",
+          "connection lost",
+          "disconnected",
+          "network error",
+          "maintenance",
+          "login expired"
+        ];
+
+        const hasError = errorPatterns.some(pat => lowerText.includes(pat));
+        if (hasError) {
+          const confirmSelectors = [
+            "button.swal2-confirm",
+            ".el-message-box__btns button",
+            ".el-message-box__btns .el-button--primary",
+            "button.swal-button--confirm",
+            ".modal-footer button",
+            "button"
+          ];
+
+          let clicked = false;
+          for (const sel of confirmSelectors) {
+            const btns = Array.from(foundBox.querySelectorAll(sel));
+            const confirmBtn = btns.find(b => {
+              const txt = (b.textContent || b.innerText || "").trim().toLowerCase();
+              return /ok|confirm|yes|close|retry|continue/i.test(txt);
+            });
+
+            if (confirmBtn) {
+              confirmBtn.click();
+              clicked = true;
+              break;
+            }
+          }
+
+          return { found: true, text: boxText.trim(), clicked };
+        }
+      }
+
+      return { found: false };
+    });
+
+    if (errorState && errorState.found) {
+      logger.warn(`[PageCheck] Found error overlay on start: "${errorState.text}". Dismissed: ${errorState.clicked}`);
+      await sleep(1500);
+      await page.reload({ waitUntil: "networkidle2", timeout: 30000 }).catch(() => {});
+    }
+  } catch (err) {
+    // Ignore errors during check
+  }
+
+  // Let it settle for a couple of seconds
+  await sleep(3000);
 }
 
 function buildAccountConfig(accountIndex = 0, accountsFilePath, modulePrefix = "") {
@@ -366,73 +465,13 @@ async function launchAccount(acctConfig) {
 
   // --- VERIFY EXTERNAL PROXY IP ---
   if (useProxy) {
-    logger.log("🌐 Verifying external IP address and routing via proxy...");
-    let tempPage = null;
-    let ipVerified = false;
-    let verificationError = null;
-
-    try {
-      tempPage = await browser.newPage();
-      if (proxy && proxy.username && proxy.password) {
-        await tempPage.authenticate({ username: proxy.username, password: proxy.password }).catch(() => {});
-      }
-
-      const reflectionServers = [
-        { url: "https://httpbin.org/ip", key: "origin" },
-        { url: "https://api.ipify.org?format=json", key: "ip" },
-        { url: "https://ipinfo.io/json", key: "ip" }
-      ];
-
-      for (const server of reflectionServers) {
-        try {
-          await tempPage.goto(server.url, { waitUntil: "networkidle2", timeout: 10000 });
-          const responseText = await tempPage.evaluate(() => document.body.innerText || document.body.textContent || "");
-          const cleanedText = responseText.trim();
-          
-          let ip = "";
-          try {
-            const data = JSON.parse(cleanedText);
-            ip = data[server.key] || data.ip || data.origin || "";
-          } catch (e) {
-            // Regex fallback if JSON parsing fails due to browser pre/code tags wrapping
-            const match = responseText.match(/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/);
-            if (match) ip = match[0];
-          }
-
-          if (ip) {
-            console.log(`\n🎉 PROXY CONNECTED! Current Public IP: \x1b[36m${ip}\x1b[0m (via ${new URL(server.url).hostname})\n`);
-            ipVerified = true;
-            verifiedIp = ip;
-            break;
-          }
-        } catch (err) {
-          logger.warn(`⚠️ Reflection server ${server.url} failed: ${err.message}. Trying fallback...`);
-        }
-      }
-    } catch (err) {
-      logger.warn(`⚠️ Warning: Error setting up IP verification page: ${err.message}`);
-      verificationError = err;
-    } finally {
-      if (tempPage) {
-        await tempPage.close().catch(() => {});
-      }
-    }
-
-    if (!ipVerified) {
-      const errorMsg = `Proxy Leak Prevention: Failed to verify external IP across all fallback reflection servers. Halting browser launch.`;
-      logger.error(`❌ ${errorMsg}`);
-      
-      try {
-        const { sendWhatsAppNotification } = require("./whatsapp_notifier");
-        await sendWhatsAppNotification(`[PROXY FAILURE] ${acctConfig.label} failed to verify its secure proxy route at launch. Browser connection halted for security. Reason: ${verificationError ? verificationError.message : 'All reflection servers failed'}`).catch(() => {});
-      } catch (e) {}
-
-      // Clean up browser instance to prevent hanging zombie processes
-      if (browser) {
-        await browser.close().catch(() => {});
-      }
-      throw new Error(errorMsg);
-    }
+    verifiedIp = await verifyProxyIp({
+      browser,
+      proxy,
+      label: acctConfig.label,
+      logger,
+      closeBrowserOnFailure: true
+    });
   }
 
   if (platform === "hippo" || platform === "directurl" || platform === "direct_url") {
@@ -451,6 +490,9 @@ async function launchAccount(acctConfig) {
       }
       
       await checkPageErrors(page, logger);
+      
+      const { startNetworkWatchdog } = require("./network_watchdog");
+      startNetworkWatchdog(page, logger);
       
       return { browser, page };
   }
@@ -594,6 +636,9 @@ async function launchAccount(acctConfig) {
         
         await checkPageErrors(page, logger);
         
+        const { startNetworkWatchdog } = require("./network_watchdog");
+        startNetworkWatchdog(page, logger);
+        
         return { browser, page, ip: verifiedIp };
       }
     } catch (err) {
@@ -613,7 +658,7 @@ async function launchAccount(acctConfig) {
   throw new Error("Failed to reach Pretty Gaming lobby after multiple attempts.");
 }
 
-module.exports = { launchAccount, buildAccountConfig };
+module.exports = { launchAccount, buildAccountConfig, checkPageErrors };
 
 if (require.main === module) {
   const accountIndex = parseInt(process.argv[2], 10) || 0;

@@ -137,8 +137,9 @@ class SessionManager {
         
         console.log(`\x1b[31m[Bet Module] Session cycle ended. Advancing account...\x1b[0m`);
         if (!this.isIntentionalRestart) {
+          const reason = page.closeReason || "Browser closed unexpectedly.";
           this.telemetry.notifyAlert(
-            `[RECOVERY] Bet module "${acctConfig.label}" relaunching. Reason: Browser closed unexpectedly.`
+            `[RECOVERY] Bet module "${acctConfig.label}" relaunching. Reason: ${reason}`
           ).catch(() => {});
         }
         

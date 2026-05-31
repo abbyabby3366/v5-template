@@ -13,6 +13,7 @@ const { spawn, exec } = require("child_process");
 const util = require("util");
 const execAsync = util.promisify(exec);
 const { getBrowserArgs } = require("./browserArgs");
+const { verifyProxyIp } = require("./proxy_verifier");
 
 // ── Login timestamp persistence ──────────────────────────────
 const LOGIN_TIMESTAMPS_FILE = path.resolve(__dirname, "login_timestamps.json");
@@ -315,73 +316,13 @@ async function launchAccount(acctConfig) {
 
   // --- VERIFY EXTERNAL PROXY IP ---
   if (useProxy) {
-    logger.log("🌐 Verifying external IP address and routing via proxy...");
-    let tempPage = null;
-    let ipVerified = false;
-    let verificationError = null;
-
-    try {
-      tempPage = await browser.newPage();
-      if (proxy && proxy.username && proxy.password) {
-        await tempPage.authenticate({ username: proxy.username, password: proxy.password }).catch(() => {});
-      }
-
-      const reflectionServers = [
-        { url: "https://httpbin.org/ip", key: "origin" },
-        { url: "https://api.ipify.org?format=json", key: "ip" },
-        { url: "https://ipinfo.io/json", key: "ip" }
-      ];
-
-      for (const server of reflectionServers) {
-        try {
-          await tempPage.goto(server.url, { waitUntil: "networkidle2", timeout: 10000 });
-          const responseText = await tempPage.evaluate(() => document.body.innerText || document.body.textContent || "");
-          const cleanedText = responseText.trim();
-          
-          let ip = "";
-          try {
-            const data = JSON.parse(cleanedText);
-            ip = data[server.key] || data.ip || data.origin || "";
-          } catch (e) {
-            // Regex fallback if JSON parsing fails due to browser pre/code tags wrapping
-            const match = responseText.match(/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/);
-            if (match) ip = match[0];
-          }
-
-          if (ip) {
-            console.log(`\n🎉 PROXY CONNECTED! Current Public IP: \x1b[36m${ip}\x1b[0m (via ${new URL(server.url).hostname})\n`);
-            ipVerified = true;
-            verifiedIp = ip;
-            break;
-          }
-        } catch (err) {
-          logger.warn(`⚠️ Reflection server ${server.url} failed: ${err.message}. Trying fallback...`);
-        }
-      }
-    } catch (err) {
-      logger.warn(`⚠️ Warning: Error setting up IP verification page: ${err.message}`);
-      verificationError = err;
-    } finally {
-      if (tempPage) {
-        await tempPage.close().catch(() => {});
-      }
-    }
-
-    if (!ipVerified) {
-      const errorMsg = `Proxy Leak Prevention: Failed to verify external IP across all fallback reflection servers. Halting browser launch.`;
-      logger.error(`❌ ${errorMsg}`);
-      
-      try {
-        const { sendWhatsAppNotification } = require("./whatsapp_notifier");
-        await sendWhatsAppNotification(`[PROXY FAILURE] ${acctConfig.label} failed to verify its secure proxy route at launch. Browser connection halted for security. Reason: ${verificationError ? verificationError.message : 'All reflection servers failed'}`).catch(() => {});
-      } catch (e) {}
-
-      // Clean up browser instance to prevent hanging zombie processes
-      if (browser) {
-        await browser.close().catch(() => {});
-      }
-      throw new Error(errorMsg);
-    }
+    verifiedIp = await verifyProxyIp({
+      browser,
+      proxy,
+      label: acctConfig.label,
+      logger,
+      closeBrowserOnFailure: true
+    });
   }
 
   const STATES = { IN_GAME: "IN_GAME", A9_DASHBOARD: "A9_DASHBOARD", OTP_REQUIRED: "OTP_REQUIRED", A9_LOGIN: "A9_LOGIN", UNINITIALIZED: "UNINITIALIZED" };
@@ -867,9 +808,8 @@ async function launchAccount(acctConfig) {
               } catch (err) {
                 logger.warn(`Failed to save table mapping to JSON: ${err.message}`);
               }
-          } else {
-              logger.warn("Could not fetch table mapping from game iframe. Falling back to static mapping.");
-          }
+          const { startNetworkWatchdog } = require("./network_watchdog");
+          startNetworkWatchdog(page, logger);
 
           return { browser, page, gameFrame: evalContext, lastLoginTime: getLoginTimestamp(labelPrefix), tableMapping: mapping, ip: verifiedIp };
         } else {
