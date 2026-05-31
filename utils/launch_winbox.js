@@ -212,6 +212,7 @@ async function launchAccount(acctConfig) {
   const logger = { log: (msg) => console.log(`[${acctConfig.label}] ${msg}`), warn: (msg) => console.warn(`[${acctConfig.label}] ${msg}`), error: (msg) => console.error(`[${acctConfig.label}] ${msg}`) };
 
   const prefix = modulePrefix || "BET";
+  let verifiedIp = "Direct / No Proxy";
 
   if (platform === "winbox" && (!credentials.email || !credentials.password)) {
       throw new Error("Missing Winbox credentials. Please set WINBOX_EMAIL and WINBOX_PASSWORD in .env");
@@ -367,6 +368,9 @@ async function launchAccount(acctConfig) {
   if (useProxy) {
     logger.log("🌐 Verifying external IP address and routing via proxy...");
     let tempPage = null;
+    let ipVerified = false;
+    let verificationError = null;
+
     try {
       tempPage = await browser.newPage();
       if (proxy && proxy.username && proxy.password) {
@@ -379,7 +383,6 @@ async function launchAccount(acctConfig) {
         { url: "https://ipinfo.io/json", key: "ip" }
       ];
 
-      let ipVerified = false;
       for (const server of reflectionServers) {
         try {
           await tempPage.goto(server.url, { waitUntil: "networkidle2", timeout: 10000 });
@@ -399,22 +402,36 @@ async function launchAccount(acctConfig) {
           if (ip) {
             console.log(`\n🎉 PROXY CONNECTED! Current Public IP: \x1b[36m${ip}\x1b[0m (via ${new URL(server.url).hostname})\n`);
             ipVerified = true;
+            verifiedIp = ip;
             break;
           }
         } catch (err) {
           logger.warn(`⚠️ Reflection server ${server.url} failed: ${err.message}. Trying fallback...`);
         }
       }
-
-      if (!ipVerified) {
-        logger.warn("⚠️ Warning: Failed to verify external IP across all reflection fallback servers.");
-      }
     } catch (err) {
       logger.warn(`⚠️ Warning: Error setting up IP verification page: ${err.message}`);
+      verificationError = err;
     } finally {
       if (tempPage) {
         await tempPage.close().catch(() => {});
       }
+    }
+
+    if (!ipVerified) {
+      const errorMsg = `Proxy Leak Prevention: Failed to verify external IP across all fallback reflection servers. Halting browser launch.`;
+      logger.error(`❌ ${errorMsg}`);
+      
+      try {
+        const { sendWhatsAppNotification } = require("./whatsapp_notifier");
+        await sendWhatsAppNotification(`[PROXY FAILURE] ${acctConfig.label} failed to verify its secure proxy route at launch. Browser connection halted for security. Reason: ${verificationError ? verificationError.message : 'All reflection servers failed'}`).catch(() => {});
+      } catch (e) {}
+
+      // Clean up browser instance to prevent hanging zombie processes
+      if (browser) {
+        await browser.close().catch(() => {});
+      }
+      throw new Error(errorMsg);
     }
   }
 
@@ -577,7 +594,7 @@ async function launchAccount(acctConfig) {
         
         await checkPageErrors(page, logger);
         
-        return { browser, page };
+        return { browser, page, ip: verifiedIp };
       }
     } catch (err) {
       logger.error(`Error during launch/login attempt ${mainLoopRetries}: ${err.message}`);

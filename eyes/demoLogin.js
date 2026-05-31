@@ -27,6 +27,9 @@ async function loginToDemo(browserContext, proxy = null) {
   if (proxy && proxy.server) {
     console.log("[Demo Login] 🌐 Verifying external IP address and routing via proxy...");
     let tempPage = null;
+    let ipVerified = false;
+    let verificationError = null;
+
     try {
       tempPage = await browserContext.newPage();
       if (proxy.username && proxy.password) {
@@ -39,7 +42,6 @@ async function loginToDemo(browserContext, proxy = null) {
         { url: "https://ipinfo.io/json", key: "ip" }
       ];
 
-      let ipVerified = false;
       for (const server of reflectionServers) {
         try {
           await tempPage.goto(server.url, { waitUntil: "networkidle2", timeout: 10000 });
@@ -65,16 +67,29 @@ async function loginToDemo(browserContext, proxy = null) {
           console.warn(`⚠️ [Demo Login] Reflection server ${server.url} failed: ${err.message}. Trying fallback...`);
         }
       }
-
-      if (!ipVerified) {
-        console.warn("⚠️ [Demo Login] Warning: Failed to verify external IP across all reflection fallback servers.");
-      }
     } catch (err) {
       console.warn(`⚠️ [Demo Login] Warning: Error setting up IP verification page: ${err.message}`);
+      verificationError = err;
     } finally {
       if (tempPage) {
         await tempPage.close().catch(() => {});
       }
+    }
+
+    if (!ipVerified) {
+      const errorMsg = `Proxy Leak Prevention: Failed to verify external IP across all fallback reflection servers. Halting browser session restart.`;
+      console.error(`❌ [Demo Login] ${errorMsg}`);
+      
+      try {
+        const { sendWhatsAppNotification } = require("../utils/whatsapp_notifier");
+        await sendWhatsAppNotification(`[PROXY FAILURE] Demo Login session failed to verify its secure proxy route during restart. Browser swap halted for security. Reason: ${verificationError ? verificationError.message : 'All reflection servers failed'}`).catch(() => {});
+      } catch (e) {}
+
+      // Close the newPage we just opened to prevent leak or zombie tabs
+      if (newPage && !newPage.isClosed()) {
+        await newPage.close().catch(() => {});
+      }
+      throw new Error(errorMsg);
     }
   }
 

@@ -7,6 +7,7 @@ class BrowserController {
     this.browserInstance = null;
     this.browserPage = null;
     this.isBrowserReady = false;
+    this.currentIp = "Offline";
   }
 
   /**
@@ -78,10 +79,11 @@ class BrowserController {
     }
 
     console.log(`\n[Browser] Starting winbox browser sequence for ${acctConfig.label}...`);
-    const { browser, page } = await launchAccount(acctConfig);
+    const { browser, page, ip } = await launchAccount(acctConfig);
 
     this.browserInstance = browser;
     this.browserPage = page;
+    this.currentIp = ip || "Direct / No Proxy";
     this.isBrowserReady = true;
 
     // Inject standard client state WebSocket interceptor
@@ -101,6 +103,7 @@ class BrowserController {
 
   async close() {
     this.isBrowserReady = false;
+    this.currentIp = "Offline";
     const browser = this.browserInstance;
     this.browserInstance = null;
     this.browserPage = null;

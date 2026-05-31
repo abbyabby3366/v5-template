@@ -53,7 +53,8 @@ function sendHeartbeat() {
   telemetry.sendHeartbeat(
     getAccountLabel(),
     browserController.isReady(),
-    latestBalance
+    latestBalance,
+    browserController.currentIp
   );
 }
 

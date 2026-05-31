@@ -1,0 +1,22 @@
+[
+  {
+    "label": "PG Eyes Winbox",
+    "platform": "hippo",
+    "launchMethod": "connect",
+    "enableDomCleanup": true,
+    "profileIndex": 2,
+    "debuggingPort": 9223,
+    "run": true,
+    "sessionRestartMinutes": 480,
+    "useProxy": true,
+    "proxy": {
+      "server": "http://127.0.0.1:8340",
+      "username": "OPTIONAL_USERNAME",
+      "password": "OPTIONAL_PASSWORD"
+    },
+    "credentials": {
+      "email": "abbyabby3366@gmail.com",
+      "password": "Aaaa8888"
+    }
+  }
+]

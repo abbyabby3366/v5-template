@@ -16,13 +16,14 @@ class TelemetryService {
    * @param {string} accountLabel 
    * @param {boolean} isAccepting 
    * @param {string|null} latestBalance 
+   * @param {string|null} currentIp
    */
-  async sendHeartbeat(accountLabel, isAccepting, latestBalance) {
+  async sendHeartbeat(accountLabel, isAccepting, latestBalance, currentIp = null) {
     const payload = {
       moduleId: accountLabel, // Dynamic per active account label
       baseUrl: this.baseUrl,
       label: accountLabel,    
-      accounts: [{ label: accountLabel, isAcceptingBets: isAccepting, balance: latestBalance }]
+      accounts: [{ label: accountLabel, isAcceptingBets: isAccepting, balance: latestBalance, ip: currentIp || "Checking..." }]
     };
 
     try {
