@@ -32,6 +32,29 @@ class SessionManager {
 
     this.sessionRestartTimer = null;
     this.isIntentionalRestart = false;
+    this.runningAccountLabel = null;
+
+    // Standalone live timing window monitoring interval (checks every 10 seconds)
+    setInterval(async () => {
+      if (this.browserController.isReady() && this.runningAccountLabel) {
+        const currentConfig = this.rotator.getCurrentConfig(); // Calling this will execute ensureActiveTiming() and shift the index if out of window
+        if (currentConfig.label !== this.runningAccountLabel) {
+          console.log(`\x1b[33m[Timing Monitor] Account timing window expired for running session: ${this.runningAccountLabel}. Shifting to: ${currentConfig.label}...\x1b[0m`);
+          
+          this.browserController.isBrowserReady = false;
+          this.sendHeartbeatFn();
+          
+          // Wait briefly for active bets to complete
+          const maxWaitMs = 15000;
+          const startWait = Date.now();
+          while (this.queueProcessor.isProcessing() && (Date.now() - startWait < maxWaitMs)) {
+            await new Promise(r => setTimeout(r, 1000));
+          }
+          
+          await this.triggerRestart();
+        }
+      }
+    }, 10000);
   }
 
   /**
@@ -109,6 +132,7 @@ class SessionManager {
     while (true) {
       try {
         const acctConfig = this.rotator.getCurrentConfig();
+        this.runningAccountLabel = acctConfig.label;
         console.log(`\n[Bet Module] Initializing session lifecycle for ${acctConfig.label} (Index: ${this.rotator.getCurrentIndex()})...`);
         
         const { page } = await this.browserController.launch(acctConfig);
