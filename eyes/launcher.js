@@ -26,7 +26,15 @@ async function launchBrowserSession(acctConfig) {
   console.log(`[Launcher] Launching account "${acctConfig.label}"...`);
   updateLoginTimestamp(acctConfig.label);
 
-  const { browser, page } = await launchAccount(acctConfig);
+  const { browser, page: initialPage } = await launchAccount(acctConfig);
+  
+  // Navigate to lobby page via loginToDemo
+  const { loginToDemo } = require("./demoLogin");
+  const page = await loginToDemo(browser, acctConfig.proxy, initialPage);
+
+  // Wire up the active network watchdog on initial boot
+  startNetworkWatchdog(page, console);
+
   console.log("[Launcher] Page loaded successfully.");
   return { browser, page };
 }

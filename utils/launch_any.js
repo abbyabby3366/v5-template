@@ -10,8 +10,7 @@ const fs = require("fs");
 const { spawn } = require("child_process");
 const { getBrowserArgs } = require("./browserArgs");
 const { verifyProxyIp } = require("./proxy_verifier");
-const { checkPageErrors } = require("./launch_winbox");
-const { startNetworkWatchdog } = require("./network_watchdog");
+
 
 const LOGIN_TIMESTAMPS_FILE = path.resolve(__dirname, "login_timestamps.json");
 function readLoginTimestamps() {
@@ -73,9 +72,6 @@ function buildAccountConfig(accountIndex = 0, accountsFilePath, modulePrefix = "
     useProxy,
     proxy: useProxy ? rawProxy : {},
     credentials: account.credentials || {},
-    urls: {
-      pgLobby: ["hippo168.com", "cloudfront.net"]
-    },
   };
 }
 
@@ -225,25 +221,8 @@ async function launchAccount(acctConfig) {
     });
   }
 
-  logger.log(`Platform is ${platform}. Preparing Hippo page...`);
   let pages = await browser.pages();
   let page = pages.length > 0 ? pages[0] : await browser.newPage();
-  
-  const currentUrl = page.url() || "";
-  const isAlreadyOnLobby = urls.pgLobby.some(domain => currentUrl.includes(domain)) && currentUrl.includes("multiplay");
-  
-  if (isAlreadyOnLobby) {
-    logger.log("Browser is already on the Hippo multiplay page. Skipping navigation to avoid disrupting active session.");
-  } else {
-    logger.log("Navigating to Hippo multiplay lobby...");
-    await page.goto("https://d3jai9eacl1740.cloudfront.net/lobby/multiplay", { waitUntil: "networkidle2", timeout: TIMEOUTS.navigationWait }).catch(() => {});
-  }
-  
-  await checkPageErrors(page, logger);
-
-  // Start active network watchdog on the page context
-  startNetworkWatchdog(page, logger);
-
   return { browser, page, ip: verifiedIp };
 }
 

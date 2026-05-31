@@ -12,12 +12,12 @@ const { verifyProxyIp } = require("../utils/proxy_verifier");
  * @param {object} [proxy]
  * @returns {Promise<object>} The fully loaded and validated Demo page instance
  */
-async function loginToDemo(browserContext, proxy = null) {
+async function loginToDemo(browserContext, proxy = null, pageToUse = null) {
   if (!browserContext) throw new Error("browserContext is required to login to Demo");
-  const newPage = await browserContext.newPage();
+  const newPage = pageToUse || await browserContext.newPage();
 
   if (proxy && proxy.server && proxy.username && proxy.password) {
-    console.log("[Demo Login] Applying proxy authentication to new demo session page...");
+    console.log("[Demo Login] Applying proxy authentication to page...");
     await newPage.authenticate({
       username: proxy.username,
       password: proxy.password
@@ -35,7 +35,7 @@ async function loginToDemo(browserContext, proxy = null) {
       });
     } catch (err) {
       // Close the newPage we just opened to prevent leak or zombie tabs
-      if (newPage && !newPage.isClosed()) {
+      if (newPage && !newPage.isClosed() && !pageToUse) {
         await newPage.close().catch(() => {});
       }
       throw err;
