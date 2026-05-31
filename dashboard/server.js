@@ -180,7 +180,15 @@ let lastRoundRobinIndex = -1;
 let lastRoundRobinModuleIds = []; // track the ordered list of module IDs for stable cycling
 let lastUsedModuleId = null;      // track which module was last dispatched to
 
-function resolveBetModuleTarget() {
+let lastFixedRoundRobinIndex = -1;
+let lastFixedRoundRobinModuleIds = [];
+let lastUsedFixedModuleId = null;
+
+let lastVariableRoundRobinIndex = -1;
+let lastVariableRoundRobinModuleIds = [];
+let lastUsedVariableModuleId = null;
+
+function resolveReadyModules() {
   const now = Date.now();
   // Filter modules that sent a heartbeat in the last 12 seconds AND are not busy
   let online = Array.from(activeModules.values()).filter(m => {
@@ -220,17 +228,163 @@ function resolveBetModuleTarget() {
     return false; // If no accounts reported, don't blindly route to it
   });
 
+  return online;
+}
+
+function resolveSplitBetTargets(totalStake) {
+  const online = resolveReadyModules();
+  if (online.length === 0) return null;
+
+  // Separate online modules into Fixed and Variable pools
+  const fixedModules = online.filter(m => {
+    const acc = m.accounts[0];
+    return acc && acc.betType === 'fixed';
+  });
+
+  const variableModules = online.filter(m => {
+    const acc = m.accounts[0];
+    return !acc || acc.betType !== 'fixed'; // default is variable
+  });
+
+  // If we have candidates in BOTH pools:
+  if (fixedModules.length > 0 && variableModules.length > 0) {
+    // 1. Pick a Fixed module using Round-Robin
+    const currentFixedIds = fixedModules.map(m => m.moduleId).sort();
+    const fixedIdsChanged = JSON.stringify(currentFixedIds) !== JSON.stringify(lastFixedRoundRobinModuleIds);
+    if (fixedIdsChanged) {
+      lastFixedRoundRobinModuleIds = currentFixedIds;
+      if (lastUsedFixedModuleId) {
+        const lastPos = currentFixedIds.indexOf(lastUsedFixedModuleId);
+        lastFixedRoundRobinIndex = lastPos >= 0 ? lastPos : -1;
+      } else {
+        lastFixedRoundRobinIndex = -1;
+      }
+    }
+    lastFixedRoundRobinIndex = (lastFixedRoundRobinIndex + 1) % currentFixedIds.length;
+    const fixedModuleId = currentFixedIds[lastFixedRoundRobinIndex];
+    const fixedModule = fixedModules.find(m => m.moduleId === fixedModuleId);
+    lastUsedFixedModuleId = fixedModuleId;
+
+    // 2. Pick a Variable module using Round-Robin
+    const currentVariableIds = variableModules.map(m => m.moduleId).sort();
+    const variableIdsChanged = JSON.stringify(currentVariableIds) !== JSON.stringify(lastVariableRoundRobinModuleIds);
+    if (variableIdsChanged) {
+      lastVariableRoundRobinModuleIds = currentVariableIds;
+      if (lastUsedVariableModuleId) {
+        const lastPos = currentVariableIds.indexOf(lastUsedVariableModuleId);
+        lastVariableRoundRobinIndex = lastPos >= 0 ? lastPos : -1;
+      } else {
+        lastVariableRoundRobinIndex = -1;
+      }
+    }
+    lastVariableRoundRobinIndex = (lastVariableRoundRobinIndex + 1) % currentVariableIds.length;
+    const variableModuleId = currentVariableIds[lastVariableRoundRobinIndex];
+    const variableModule = variableModules.find(m => m.moduleId === variableModuleId);
+    lastUsedVariableModuleId = variableModuleId;
+
+    // 3. Perform split allocation
+    const allowedFixed = (fixedModule.accounts[0] && fixedModule.accounts[0].allowedFixedAmounts) || [5000, 10000, 15000, 20000];
+    
+    // Find valid fixed steps that are less than or equal to totalStake
+    const validSteps = allowedFixed.filter(val => val <= totalStake);
+
+    if (validSteps.length > 0) {
+      // Option A2 choice: Randomize selection between all valid steps to keep betting patterns organic
+      const randomIndex = Math.floor(Math.random() * validSteps.length);
+      const fixedAmount = validSteps[randomIndex];
+      
+      let variableRemainder = totalStake - fixedAmount;
+
+      // Option A4 choice: Apply dynamic clean rounding on the variable remainder
+      const rounding = betConfig.rounding || 100;
+      if (variableRemainder > 0 && rounding > 0) {
+        variableRemainder = Math.round(variableRemainder / rounding) * rounding;
+      }
+
+      return {
+        isSplit: true,
+        fixedTarget: { baseUrl: fixedModule.baseUrl, moduleId: fixedModule.moduleId, label: fixedModule.accounts[0].label || fixedModule.moduleId },
+        fixedAmount: fixedAmount,
+        variableTarget: { baseUrl: variableModule.baseUrl, moduleId: variableModule.moduleId, label: variableModule.accounts[0].label || variableModule.moduleId },
+        variableAmount: variableRemainder
+      };
+    } else {
+      // If no fixed step is less than totalStake (e.g. totalStake is 3000 but min fixed step is 5000)
+      // Fallbacks to variable-only for the full stake
+      return {
+        isSplit: false,
+        target: { baseUrl: variableModule.baseUrl, moduleId: variableModule.moduleId, label: variableModule.accounts[0].label || variableModule.moduleId },
+        amount: totalStake
+      };
+    }
+  }
+
+  // Fallback 1: If only Fixed modules are online
+  if (fixedModules.length > 0 && variableModules.length === 0) {
+    // Pick one Fixed module using Round-Robin
+    const currentFixedIds = fixedModules.map(m => m.moduleId).sort();
+    const fixedIdsChanged = JSON.stringify(currentFixedIds) !== JSON.stringify(lastFixedRoundRobinModuleIds);
+    if (fixedIdsChanged) {
+      lastFixedRoundRobinModuleIds = currentFixedIds;
+      if (lastUsedFixedModuleId) {
+        const lastPos = currentFixedIds.indexOf(lastUsedFixedModuleId);
+        lastFixedRoundRobinIndex = lastPos >= 0 ? lastPos : -1;
+      } else {
+        lastFixedRoundRobinIndex = -1;
+      }
+    }
+    lastFixedRoundRobinIndex = (lastFixedRoundRobinIndex + 1) % currentFixedIds.length;
+    const fixedModuleId = currentFixedIds[lastFixedRoundRobinIndex];
+    const fixedModule = fixedModules.find(m => m.moduleId === fixedModuleId);
+    lastUsedFixedModuleId = fixedModuleId;
+
+    // Option A3 choice: Bet the exact full stake anyway, bypassing the fixed restriction as a fallback
+    return {
+      isSplit: false,
+      target: { baseUrl: fixedModule.baseUrl, moduleId: fixedModule.moduleId, label: fixedModule.accounts[0].label || fixedModule.moduleId },
+      amount: totalStake
+    };
+  }
+
+  // Fallback 2: If only Variable modules are online
+  if (variableModules.length > 0 && fixedModules.length === 0) {
+    // Pick one Variable module using Round-Robin
+    const currentVariableIds = variableModules.map(m => m.moduleId).sort();
+    const variableIdsChanged = JSON.stringify(currentVariableIds) !== JSON.stringify(lastVariableRoundRobinModuleIds);
+    if (variableIdsChanged) {
+      lastVariableRoundRobinModuleIds = currentVariableIds;
+      if (lastUsedVariableModuleId) {
+        const lastPos = currentVariableIds.indexOf(lastUsedVariableModuleId);
+        lastVariableRoundRobinIndex = lastPos >= 0 ? lastPos : -1;
+      } else {
+        lastVariableRoundRobinIndex = -1;
+      }
+    }
+    lastVariableRoundRobinIndex = (lastVariableRoundRobinIndex + 1) % currentVariableIds.length;
+    const variableModuleId = currentVariableIds[lastVariableRoundRobinIndex];
+    const variableModule = variableModules.find(m => m.moduleId === variableModuleId);
+    lastUsedVariableModuleId = variableModuleId;
+
+    return {
+      isSplit: false,
+      target: { baseUrl: variableModule.baseUrl, moduleId: variableModule.moduleId, label: variableModule.accounts[0].label || variableModule.moduleId },
+      amount: totalStake
+    };
+  }
+
+  return null;
+}
+
+function resolveBetModuleTarget() {
+  const online = resolveReadyModules();
   if (online.length === 0) return null;
 
   if (betConfig.mode === 'round_robin' || !betConfig.mode) {
-    // Build a stable sorted list of module IDs to cycle through
     const currentIds = online.map(m => m.moduleId).sort();
     const idsChanged = JSON.stringify(currentIds) !== JSON.stringify(lastRoundRobinModuleIds);
 
     if (idsChanged) {
       lastRoundRobinModuleIds = currentIds;
-      // When modules change, find where the last-used module sits in the new list
-      // and continue from the NEXT one to avoid double-picking
       if (lastUsedModuleId) {
         const lastPos = currentIds.indexOf(lastUsedModuleId);
         lastRoundRobinIndex = lastPos >= 0 ? lastPos : -1;
@@ -239,7 +393,6 @@ function resolveBetModuleTarget() {
       }
     }
 
-    // Advance to next module
     lastRoundRobinIndex = (lastRoundRobinIndex + 1) % currentIds.length;
     const targetModuleId = currentIds[lastRoundRobinIndex];
     const targetModule = online.find(m => m.moduleId === targetModuleId);
@@ -251,7 +404,6 @@ function resolveBetModuleTarget() {
     return null;
   }
 
-  // Default fallback if mode isn't recognized or we add others later
   const fallback = online[0];
   lastUsedModuleId = fallback.moduleId;
   return { baseUrl: fallback.baseUrl, moduleId: fallback.moduleId };
@@ -303,58 +455,215 @@ function processCentralQueue() {
 
   if (centralBetQueue.length === 0) return;
 
-  const targetResult = resolveBetModuleTarget();
-  if (!targetResult) {
+  const betEntry = centralBetQueue[0]; // peek
+  const splitResult = resolveSplitBetTargets(betEntry.recommendedBetAmount);
+
+  if (!splitResult) {
     // Debug logging to understand why targetResult is null
     const now = Date.now();
-    console.log(`[Central] processCentralQueue: No target found! Queue length: ${centralBetQueue.length}. Active modules: ${activeModules.size}`);
+    console.log(`[Central] processCentralQueue: No target found for bet ${betEntry.id}! Queue length: ${centralBetQueue.length}. Active modules: ${activeModules.size}`);
     for (const [id, m] of activeModules) {
       console.log(` - Module ${id}: isBusy=${m.isBusy}, heartbeatAge=${now - m.lastHeartbeat}ms, accounts=${m.accounts ? m.accounts.length : 0}`);
       if (m.accounts && m.accounts.length > 0) {
-        console.log(`   - Acc[0]: isAcceptingBets=${m.accounts[0].isAcceptingBets}, balance=${m.accounts[0].balance}`);
+        console.log(`   - Acc[0]: isAcceptingBets=${m.accounts[0].isAcceptingBets}, balance=${m.accounts[0].balance}, betType=${m.accounts[0].betType || 'variable'}`);
       }
     }
     return; // no available modules right now
   }
 
-  const betEntry = centralBetQueue.shift();
-  const targetModuleId = targetResult.moduleId;
-  const targetBaseUrl = targetResult.baseUrl;
+  // Dequeue the bet now that targets are successfully resolved
+  centralBetQueue.shift();
 
-  const mod = activeModules.get(targetModuleId);
-  if (mod) {
-    mod.isBusy = true;
-    mod.busySince = Date.now();
-  }
+  if (splitResult.isSplit) {
+    const { fixedTarget, fixedAmount, variableTarget, variableAmount } = splitResult;
+    console.log(`[Central] Splitting bet ${betEntry.id} (${betEntry.recommendedBetAmount}) -> Fixed: ${fixedAmount} (${fixedTarget.label}), Variable: ${variableAmount} (${variableTarget.label})`);
 
-  let targetModuleLabel = mod && mod.label ? mod.label : targetModuleId;
-  if (mod && mod.accounts && mod.accounts.length > 0 && mod.accounts[0].label) {
-    targetModuleLabel = mod.accounts[0].label;
-  }
+    // Flag both modules as busy
+    const fixedMod = activeModules.get(fixedTarget.moduleId);
+    if (fixedMod) {
+      fixedMod.isBusy = true;
+      fixedMod.busySince = Date.now();
+    }
+    const varMod = activeModules.get(variableTarget.moduleId);
+    if (varMod) {
+      varMod.isBusy = true;
+      varMod.busySince = Date.now();
+    }
 
-  betEntry.targetModuleId = targetModuleId;
-  betEntry.targetModule = targetModuleLabel;
-  betEntry.outcome = "PENDING";
+    // 1. Create sub-bet for Fixed account
+    const fixedBet = {
+      ...betEntry,
+      id: `${betEntry.id}_0`,
+      recommendedBetAmount: fixedAmount,
+      targetModuleId: fixedTarget.moduleId,
+      targetModule: fixedTarget.label,
+      outcome: "PENDING"
+    };
+    delete fixedBet._id; // Prevent duplicate key error in MongoDB!
 
-  if (dbCollection) {
-    dbCollection.updateOne(
-      { id: betEntry.id },
-      { $set: { targetModuleId: betEntry.targetModuleId, targetModule: betEntry.targetModule, outcome: betEntry.outcome } }
-    ).catch(() => { });
-  }
+    // 2. Create sub-bet for Variable account
+    const variableBet = {
+      ...betEntry,
+      id: `${betEntry.id}_1`,
+      recommendedBetAmount: variableAmount,
+      targetModuleId: variableTarget.moduleId,
+      targetModule: variableTarget.label,
+      outcome: "PENDING"
+    };
+    delete variableBet._id; // Prevent duplicate key error in MongoDB!
 
-  fetch(targetBaseUrl + "/prettygaming/bet", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(betEntry)
-  }).then(async (resp) => {
-    if (!resp.ok) {
-      // Non-2xx response (e.g. 503 "Browser not ready" during session restart)
-      let errMsg = `HTTP ${resp.status}`;
-      try { const body = await resp.json(); errMsg = body.error || errMsg; } catch (e) { }
-      console.error(`[Central] Bet dispatch to ${targetModuleLabel} rejected: ${errMsg}`);
-      betEntry.outcome = "DISPATCH_FAILED";
-      betEntry.executionState = { status: "DISPATCH_FAILED", reason: errMsg };
+    // Push both to betLog in-memory and write to DB
+    betLog.unshift(fixedBet);
+    betLog.unshift(variableBet);
+    if (betLog.length > MAX_BET_LOG) betLog.length = MAX_BET_LOG;
+
+    // Update parent original bet state to SPLIT
+    betEntry.outcome = "SPLIT";
+    betEntry.executionState = { status: "SPLIT", reason: `Split into ${fixedBet.id} and ${variableBet.id}` };
+
+    if (dbCollection) {
+      dbCollection.insertOne(fixedBet).catch(() => {});
+      dbCollection.insertOne(variableBet).catch(() => {});
+      dbCollection.updateOne(
+        { id: betEntry.id },
+        { $set: { outcome: betEntry.outcome, executionState: betEntry.executionState } }
+      ).catch(() => {});
+    }
+
+    // Dispatch both in parallel
+    // Fixed Account Dispatch
+    fetch(fixedTarget.baseUrl + "/prettygaming/bet", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(fixedBet)
+    }).then(async (resp) => {
+      if (!resp.ok) {
+        let errMsg = `HTTP ${resp.status}`;
+        try { const body = await resp.json(); errMsg = body.error || errMsg; } catch (e) { }
+        console.error(`[Central] Fixed Split Bet dispatch to ${fixedTarget.label} rejected: ${errMsg}`);
+        fixedBet.outcome = "DISPATCH_FAILED";
+        fixedBet.executionState = { status: "DISPATCH_FAILED", reason: errMsg };
+        if (fixedMod) {
+          fixedMod.isBusy = false;
+          fixedMod.busySince = null;
+        }
+        if (dbCollection) {
+          dbCollection.updateOne(
+            { id: fixedBet.id },
+            { $set: { outcome: fixedBet.outcome, executionState: fixedBet.executionState } }
+          ).catch(() => { });
+        }
+      }
+    }).catch(err => {
+      console.error("[Central] Failed to dispatch Fixed split bet:", err.message);
+      fixedBet.outcome = "NETWORK_ERROR";
+      fixedBet.executionState = { status: "NETWORK_ERROR", reason: err.message };
+      if (fixedMod) {
+        fixedMod.isBusy = false;
+        fixedMod.busySince = null;
+      }
+      if (dbCollection) {
+        dbCollection.updateOne(
+          { id: fixedBet.id },
+          { $set: { outcome: fixedBet.outcome, executionState: fixedBet.executionState } }
+        ).catch(() => { });
+      }
+    });
+
+    // Variable Account Dispatch with a dynamic micro-jitter delay from .env
+    const delayParts = (process.env.SPLIT_BET_DELAY_MS || "200,800").split(",");
+    const delayMin = parseInt(delayParts[0], 10) || 200;
+    const delayMax = parseInt(delayParts[1], 10) || 800;
+    const jitterDelay = Math.floor(Math.random() * (delayMax - delayMin) + delayMin);
+    setTimeout(() => {
+      fetch(variableTarget.baseUrl + "/prettygaming/bet", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(variableBet)
+      }).then(async (resp) => {
+        if (!resp.ok) {
+          let errMsg = `HTTP ${resp.status}`;
+          try { const body = await resp.json(); errMsg = body.error || errMsg; } catch (e) { }
+          console.error(`[Central] Variable Split Bet dispatch to ${variableTarget.label} rejected: ${errMsg}`);
+          variableBet.outcome = "DISPATCH_FAILED";
+          variableBet.executionState = { status: "DISPATCH_FAILED", reason: errMsg };
+          if (varMod) {
+            varMod.isBusy = false;
+            varMod.busySince = null;
+          }
+          if (dbCollection) {
+            dbCollection.updateOne(
+              { id: variableBet.id },
+              { $set: { outcome: variableBet.outcome, executionState: variableBet.executionState } }
+            ).catch(() => { });
+          }
+        }
+      }).catch(err => {
+        console.error("[Central] Failed to dispatch Variable split bet:", err.message);
+        variableBet.outcome = "NETWORK_ERROR";
+        variableBet.executionState = { status: "NETWORK_ERROR", reason: err.message };
+        if (varMod) {
+          varMod.isBusy = false;
+          varMod.busySince = null;
+        }
+        if (dbCollection) {
+          dbCollection.updateOne(
+            { id: variableBet.id },
+            { $set: { outcome: variableBet.outcome, executionState: variableBet.executionState } }
+          ).catch(() => { });
+        }
+      });
+    }, jitterDelay);
+
+  } else {
+    // Single module fallback (either variable-only or fixed-only)
+    const { target, amount } = splitResult;
+    console.log(`[Central] Dispatching single fallback bet ${betEntry.id} to ${target.label} for stake: ${amount}`);
+
+    const mod = activeModules.get(target.moduleId);
+    if (mod) {
+      mod.isBusy = true;
+      mod.busySince = Date.now();
+    }
+
+    betEntry.targetModuleId = target.moduleId;
+    betEntry.targetModule = target.label;
+    betEntry.recommendedBetAmount = amount;
+    betEntry.outcome = "PENDING";
+
+    if (dbCollection) {
+      dbCollection.updateOne(
+        { id: betEntry.id },
+        { $set: { targetModuleId: betEntry.targetModuleId, targetModule: betEntry.targetModule, outcome: betEntry.outcome, recommendedBetAmount: amount } }
+      ).catch(() => { });
+    }
+
+    fetch(target.baseUrl + "/prettygaming/bet", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(betEntry)
+    }).then(async (resp) => {
+      if (!resp.ok) {
+        let errMsg = `HTTP ${resp.status}`;
+        try { const body = await resp.json(); errMsg = body.error || errMsg; } catch (e) { }
+        console.error(`[Central] Bet dispatch to ${target.label} rejected: ${errMsg}`);
+        betEntry.outcome = "DISPATCH_FAILED";
+        betEntry.executionState = { status: "DISPATCH_FAILED", reason: errMsg };
+        if (mod) {
+          mod.isBusy = false;
+          mod.busySince = null;
+        }
+        if (dbCollection) {
+          dbCollection.updateOne(
+            { id: betEntry.id },
+            { $set: { outcome: betEntry.outcome, executionState: betEntry.executionState } }
+          ).catch(() => { });
+        }
+      }
+    }).catch(err => {
+      console.error("[Central] Failed to dispatch fallback bet:", err.message);
+      betEntry.outcome = "NETWORK_ERROR";
+      betEntry.executionState = { status: "NETWORK_ERROR", reason: err.message };
       if (mod) {
         mod.isBusy = false;
         mod.busySince = null;
@@ -365,23 +674,9 @@ function processCentralQueue() {
           { $set: { outcome: betEntry.outcome, executionState: betEntry.executionState } }
         ).catch(() => { });
       }
-    }
-  }).catch(err => {
-    console.error("[Central] Failed to dispatch bet:", err.message);
-    betEntry.outcome = "NETWORK_ERROR";
-    betEntry.executionState = { status: "NETWORK_ERROR", reason: err.message };
-    if (mod) {
-      mod.isBusy = false;
-      mod.busySince = null;
-    }
-    if (dbCollection) {
-      dbCollection.updateOne(
-        { id: betEntry.id },
-        { $set: { outcome: betEntry.outcome, executionState: betEntry.executionState } }
-      ).catch(() => { });
-    }
-    processCentralQueue(); // try next bet
-  });
+      processCentralQueue(); // try next bet
+    });
+  }
 
   if (centralBetQueue.length > 0) {
     processCentralQueue();
@@ -734,8 +1029,8 @@ function startDashboard(stateManager) {
 
         if (body.status && body.status.gameState === "ROUND_COMPLETE") {
           const betId = body.uuid;
-          const existingBet = betLog.find(b => b.id === betId);
-          if (existingBet) {
+          const existingBets = betLog.filter(b => b.id === betId || b.id === `${betId}_0` || b.id === `${betId}_1`);
+          for (const existingBet of existingBets) {
             const newWinner = body.ocr?.winner || "UNKNOWN";
             if (['B', 'P', 'T'].includes(newWinner) && existingBet.roundOutcome !== newWinner) {
               existingBet.roundOutcome = newWinner;

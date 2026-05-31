@@ -50,11 +50,14 @@ async function updateBalance() {
 }
 
 function sendHeartbeat() {
+  const currentConfig = rotator.getCurrentConfig() || {};
   telemetry.sendHeartbeat(
     getAccountLabel(),
     browserController.isReady(),
     latestBalance,
-    browserController.currentIp
+    browserController.currentIp,
+    currentConfig.betType || "variable",
+    currentConfig.allowedFixedAmounts || [5000, 10000, 15000, 20000]
   );
 }
 
