@@ -152,13 +152,28 @@ setInterval(() => {
 
 function getTodayStart() {
   const now = new Date();
-  const today12pm = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0, 0);
-  if (now < today12pm) {
-    const yesterday12pm = new Date(today12pm);
-    yesterday12pm.setDate(yesterday12pm.getDate() - 1);
-    return yesterday12pm;
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Kuala_Lumpur",
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "numeric",
+    minute: "numeric",
+    second: "numeric",
+    hour12: false
+  });
+  const parts = formatter.formatToParts(now);
+  const partMap = Object.fromEntries(parts.map(p => [p.type, p.value]));
+  const myYear = parseInt(partMap.year);
+  const myMonth = parseInt(partMap.month) - 1; // 0-indexed
+  const myDay = parseInt(partMap.day);
+
+  // Today 12pm in Malaysia is Date.UTC(myYear, myMonth, myDay, 4, 0, 0, 0)
+  const today12pmUTC = new Date(Date.UTC(myYear, myMonth, myDay, 4, 0, 0, 0));
+  if (now < today12pmUTC) {
+    return new Date(today12pmUTC.getTime() - 24 * 60 * 60 * 1000);
   }
-  return today12pm;
+  return today12pmUTC;
 }
 
 let lastRoundRobinIndex = -1;
@@ -469,16 +484,32 @@ function startDashboard(stateManager) {
       if (to) {
         endStr = new Date(to).toISOString();
       }
-      const options = { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true };
+      const options = { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kuala_Lumpur' };
       const fromStr = from ? new Date(from).toLocaleString('en-GB', options) : "Beginning";
       const toStr = to ? new Date(to).toLocaleString('en-GB', options) : "End";
       dateInfo = `Custom: ${fromStr} to ${toStr}`;
     } else if (range !== "all_time") {
       const now = new Date();
-      const today12pm = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0, 0);
-      let currentPeriodStart = new Date(today12pm);
-      if (now < today12pm) {
-        currentPeriodStart.setDate(currentPeriodStart.getDate() - 1);
+      const formatter = new Intl.DateTimeFormat("en-US", {
+        timeZone: "Asia/Kuala_Lumpur",
+        year: "numeric",
+        month: "numeric",
+        day: "numeric",
+        hour: "numeric",
+        minute: "numeric",
+        second: "numeric",
+        hour12: false
+      });
+      const parts = formatter.formatToParts(now);
+      const partMap = Object.fromEntries(parts.map(p => [p.type, p.value]));
+      const myYear = parseInt(partMap.year);
+      const myMonth = parseInt(partMap.month) - 1; // 0-indexed
+      const myDay = parseInt(partMap.day);
+
+      const today12pmUTC = new Date(Date.UTC(myYear, myMonth, myDay, 4, 0, 0, 0));
+      let currentPeriodStart = today12pmUTC;
+      if (now < today12pmUTC) {
+        currentPeriodStart = new Date(today12pmUTC.getTime() - 24 * 60 * 60 * 1000);
       }
 
       let startDate = null;
@@ -486,23 +517,19 @@ function startDashboard(stateManager) {
 
       if (range === 'today') {
         startDate = new Date(currentPeriodStart);
-        endDate = new Date(currentPeriodStart);
-        endDate.setDate(endDate.getDate() + 1);
+        endDate = new Date(currentPeriodStart.getTime() + 24 * 60 * 60 * 1000);
       } else if (range === 'yesterday') {
-        startDate = new Date(currentPeriodStart);
-        startDate.setDate(startDate.getDate() - 1);
+        startDate = new Date(currentPeriodStart.getTime() - 24 * 60 * 60 * 1000);
         endDate = new Date(currentPeriodStart);
       } else if (range === 'last_7_days') {
-        startDate = new Date(currentPeriodStart);
-        startDate.setDate(startDate.getDate() - 6);
-        endDate = new Date(currentPeriodStart);
-        endDate.setDate(endDate.getDate() + 1);
+        startDate = new Date(currentPeriodStart.getTime() - 6 * 24 * 60 * 60 * 1000);
+        endDate = new Date(currentPeriodStart.getTime() + 24 * 60 * 60 * 1000);
       }
 
       if (startDate && endDate) {
         startStr = startDate.toISOString();
         endStr = endDate.toISOString();
-        const options = { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true };
+        const options = { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kuala_Lumpur' };
         dateInfo = `${startDate.toLocaleString('en-GB', options)} to ${endDate.toLocaleString('en-GB', options)}`;
       }
     }

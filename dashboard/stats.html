@@ -113,22 +113,49 @@
     function initCustomDateInputs() {
       const now = new Date();
       
-      // Calculate today's 12pm start (similar to server logic)
-      const today12pm = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0, 0);
-      let currentPeriodStart = new Date(today12pm);
-      if (now < today12pm) {
-        currentPeriodStart.setDate(currentPeriodStart.getDate() - 1);
+      // Extract current date/time components in Malaysia time (GMT+8)
+      const formatter = new Intl.DateTimeFormat("en-US", {
+        timeZone: "Asia/Kuala_Lumpur",
+        year: "numeric",
+        month: "numeric",
+        day: "numeric",
+        hour: "numeric",
+        minute: "numeric",
+        second: "numeric",
+        hour12: false
+      });
+      const parts = formatter.formatToParts(now);
+      const partMap = Object.fromEntries(parts.map(p => [p.type, p.value]));
+      const myYear = parseInt(partMap.year);
+      const myMonth = parseInt(partMap.month) - 1; // 0-indexed
+      const myDay = parseInt(partMap.day);
+      
+      // Today 12pm in Malaysia is Date.UTC(myYear, myMonth, myDay, 4, 0, 0, 0)
+      const today12pmUTC = new Date(Date.UTC(myYear, myMonth, myDay, 4, 0, 0, 0));
+      
+      let currentPeriodStartUTC;
+      if (now < today12pmUTC) {
+        currentPeriodStartUTC = new Date(today12pmUTC.getTime() - 24 * 60 * 60 * 1000);
+      } else {
+        currentPeriodStartUTC = today12pmUTC;
       }
       
-      // Format as YYYY-MM-DDTHH:MM for datetime-local
-      const toLocalISO = (date) => {
-        const offset = date.getTimezoneOffset();
-        const localDate = new Date(date.getTime() - (offset * 60 * 1000));
-        return localDate.toISOString().slice(0, 16);
+      // Format to YYYY-MM-DDTHH:MM in Malaysia time timezone
+      const toMalaysiaLocalISO = (date) => {
+        const fmt = new Intl.DateTimeFormat("sv-SE", {
+          timeZone: "Asia/Kuala_Lumpur",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false
+        });
+        return fmt.format(date).replace(" ", "T");
       };
       
-      document.getElementById('custom-from').value = toLocalISO(currentPeriodStart);
-      document.getElementById('custom-to').value = toLocalISO(now);
+      document.getElementById('custom-from').value = toMalaysiaLocalISO(currentPeriodStartUTC);
+      document.getElementById('custom-to').value = toMalaysiaLocalISO(now);
     }
 
     async function loadStats(range = 'today') {
@@ -144,8 +171,8 @@
             document.getElementById('stats-date-info').textContent = 'Invalid custom range';
             return;
           }
-          const fromISO = new Date(fromVal).toISOString();
-          const toISO = new Date(toVal).toISOString();
+          const fromISO = new Date(fromVal + "+08:00").toISOString();
+          const toISO = new Date(toVal + "+08:00").toISOString();
           url += `&from=${encodeURIComponent(fromISO)}&to=${encodeURIComponent(toISO)}`;
         }
         
