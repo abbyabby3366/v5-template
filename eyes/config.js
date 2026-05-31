@@ -1,7 +1,7 @@
 const path = require("path");
 const fs = require("fs");
 require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
-const { buildAccountConfig } = require("../utils/launch_winbox");
+const { buildAccountConfig } = require("../utils/launch_any");
 
 const ACCOUNTS_PATH = path.resolve(__dirname, "json", "eyes_accounts.json");
 const CONFIG_PATH = path.join(__dirname, "..", "dashboard", "config.json");

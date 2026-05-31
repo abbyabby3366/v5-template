@@ -474,29 +474,6 @@ async function launchAccount(acctConfig) {
     });
   }
 
-  if (platform === "hippo" || platform === "directurl" || platform === "direct_url") {
-      logger.log(`Platform is ${platform}. Preparing Hippo page...`);
-      let pages = await browser.pages();
-      let page = pages.length > 0 ? pages[0] : await browser.newPage();
-      
-      const currentUrl = page.url() || "";
-      const isAlreadyOnLobby = urls.pgLobby.some(domain => currentUrl.includes(domain)) && currentUrl.includes("multiplay");
-      
-      if (isAlreadyOnLobby) {
-        logger.log("Browser is already on the Hippo multiplay page. Skipping navigation to avoid disrupting active session.");
-      } else {
-        logger.log("Navigating to Hippo multiplay lobby...");
-        await page.goto("https://d3jai9eacl1740.cloudfront.net/lobby/multiplay", { waitUntil: "networkidle2", timeout: TIMEOUTS.navigationWait }).catch(() => {});
-      }
-      
-      await checkPageErrors(page, logger);
-      
-      const { startNetworkWatchdog } = require("./network_watchdog");
-      startNetworkWatchdog(page, logger);
-      
-      return { browser, page };
-  }
-
   let mainLoopRetries = 0;
   while (mainLoopRetries < 3) {
     mainLoopRetries++;

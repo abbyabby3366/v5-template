@@ -48,11 +48,7 @@ async function loginToDemo(browserContext, proxy = null) {
   }).catch(() => {});
   
   await checkPageErrors(newPage, { log: console.log, warn: console.warn, error: console.error });
-
-  // Start active network watchdog on the swapped page context
-  const { startNetworkWatchdog } = require("../utils/network_watchdog");
-  startNetworkWatchdog(newPage, { log: console.log, warn: console.warn, error: console.error });
-
+  
   return newPage;
 }
 

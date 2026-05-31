@@ -808,6 +808,7 @@ async function launchAccount(acctConfig) {
               } catch (err) {
                 logger.warn(`Failed to save table mapping to JSON: ${err.message}`);
               }
+          }
           const { startNetworkWatchdog } = require("./network_watchdog");
           startNetworkWatchdog(page, logger);
 

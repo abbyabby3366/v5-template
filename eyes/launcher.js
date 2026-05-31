@@ -10,11 +10,12 @@
 
 const fs = require("fs");
 const path = require("path");
-const { launchAccount } = require("../utils/launch_winbox");
+const { launchAccount } = require("../utils/launch_any");
 const { sendWhatsAppNotification } = require("../utils/whatsapp_notifier");
 const config = require("./config");
 const { runEventBasedEyes } = require("./runEyes");
 const { setupSessionRestart, updateLoginTimestamp } = require("./sessionManager");
+const { startNetworkWatchdog } = require("../utils/network_watchdog");
 
 /**
  * Standard browser launcher for the eyes module.
@@ -52,6 +53,7 @@ async function start() {
       restartTimer = setupSessionRestart(browser, pageRef, acctConfig, async (newPage) => {
         await newPage.evaluate(extractorCode).catch(() => {});
         await newPage.evaluateOnNewDocument(extractorCode).catch(() => {});
+        startNetworkWatchdog(newPage, console);
       });
 
       console.log("[Launcher] Initializing event-driven engine...");
