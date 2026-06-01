@@ -1,174 +1,255 @@
-# Game Integration Guide: Standardizing Game States and Normalization
+# How to Create a Working Interceptor for the `eyes` Module
 
-This integration guide explains the standard interface contract, naming conventions, card normalization rules, and session launching required to integrate new game types into the `eyes` module. Following this guide ensures that any new game engine or data interceptor communicates with `tableManager.js` without issues.
+> [!NOTE]
+> ### ⚡ Executive Summary (TL;DR)
+> The client-side Interceptor is a JavaScript payload injected into the target lobby browser page. Its role is two-fold:
+> 1. **Initial Extract**: Populates `window.__tableStatesCache` with current states on startup.
+> 2. **Real-time Listen**: Hooks network and state layers (WS, Socket.io, Pinia) to detect live events, map room IDs, normalize parameters, and trigger the Node.js callback `window.onTableStateUpdate(table)`.
+> 
+> Follow this blueprint to construct an interceptor that integrates with `runEyes.js`, `tableManager.js`, and `evCalculator.js`.
 
 ---
 
-## 🚨 Critical Interface Contract
+## 🔗 The Node.js-to-Browser Bridge Architecture
 
-The server-side State Manager ([tableManager.js](file:///c:/Users/desmo/Desktop/v5-template/eyes/tableManager.js)) expects the interceptor to cache client-side WebSocket / Pinia / Socket.io packets and translate them into a 100% standardized schema. 
+The backend supervisor (`launcher.js` and `runEyes.js`) uses Puppeteer to manage the lifecycle of the browser and interceptor. Understanding this connection is vital for building a functional interceptor:
 
-Every parsed table state object must conform to this exact shape:
+```
++-----------------------------------------------------------+
+|                   Node.js Backend Engine                  |
+|  - tableManager.js  - evCalculator.js                     |
++-----------------------------+-----------------------------+
+                              |
+                     Puppeteer exposing / injecting
+                              v
++-----------------------------------------------------------+
+|                  Target Browser Page                      |
+|                                                           |
+|   1. Global Cache: `window.__tableStatesCache`            |
+|   2. Parser Hook:  `window.getParsedTable(roomId)`        |
+|   3. Callback:     `window.onTableStateUpdate(table)`     |
+|                                                           |
+|   +---------------------------------------------------+   |
+|   |         Active Interceptor Injection              |   |
+|   |  - Hook WebSocket  - Hook Socket.io  - Hook Pinia |   |
+|   +---------------------------------------------------+   |
++-----------------------------------------------------------+
+```
 
-```typescript
-interface StandardizedTableState {
-  /** The primary key map identifier (e.g., "PrettyMG05") */
-  tableName: string;
+### 1. Injected Code Execution
+`launcher.js` reads the interceptor script from disk and evaluates it on the page during page creation and upon navigation:
+* `await page.evaluate(extractorCode)`
+* `await page.evaluateOnNewDocument(extractorCode)`
 
-  /** Database or API lookup room ID (e.g., "BAC-005") */
-  tableId: string | null;
+### 2. Live Update Event Callback
+`runEyes.js` exposes a Node function to the browser window under the name `onTableStateUpdate`:
+* When the interceptor catches an update in the browser, it **must** call:
+  ```javascript
+  if (typeof window.onTableStateUpdate === "function") {
+    window.onTableStateUpdate(parsedTableStateObject);
+  }
+  ```
 
-  /** 
-   * Normalized game state. 
-   * Supported: "Waiting for Bets", "Dealing", "Result", "Shuffling".
-   * Note: Result states must include the "Result" suffix or be exactly "Result".
-   */
-  state: string;
+### 3. Initial State Priming
+During a launch or seamless page recovery, the engine directly queries the interceptor's cache to pull current states without waiting for live network packets:
+```javascript
+const allParsed = await page.evaluate(() => {
+  const cache = window.__tableStatesCache || {};
+  const rooms = Object.keys(cache);
+  if (typeof getParsedTable !== "function" || rooms.length === 0) return [];
+  return rooms.map(roomId => getParsedTable(roomId)).filter(Boolean);
+});
+```
 
-  /** Remaining seconds for betting, or -1 when betting is closed/inactive */
-  timer: number;
+---
 
-  /** Current round number (1-based index) */
-  round: number;
+## 🛠️ Required Global Interface Hook Contract
 
-  /** Cumulative shoe statistics */
-  wins: {
-    P: number; // Player wins
-    B: number; // Banker wins
-    T: number; // Tie wins
+To successfully interact with the backend supervisor, the interceptor **must** register three global endpoints on the browser's `window` object:
+
+### 1. `window.__tableStatesCache` (Object)
+* **Purpose**: Serves as the database of raw or partially-parsed network packets for each active room.
+* **Format**: Key-value map using the provider's raw `roomId` (e.g., `"BAC-005"`) as the key:
+  ```javascript
+  window.__tableStatesCache = {
+    "BAC-005": { /* raw or updated packet state */ },
+    "BAC-MG06": { /* raw or updated packet state */ }
   };
+  ```
 
-  /** Normalized array of Player cards (e.g., ["8D", "7H"]) */
-  playerCards: string[];
+### 2. `window.getParsedTable(roomId)` (Function)
+* **Purpose**: Translates a cached record from `window.__tableStatesCache` into the standardized state object.
+* **Return Value**: A `StandardizedTableState` object, or `null` if the room has no cache record yet.
 
-  /** Normalized array of Banker cards (e.g., ["9S", "QD"]) */
-  bankerCards: string[];
-
-  /** Combined array of all cards dealt in the current round */
-  allCards: string[];
-
-  /** Final hand outcome letter ("P" | "B" | "T" | null) */
-  winner: "P" | "B" | "T" | null;
-
-  /** Bead road statistics history array representing previous round outcomes */
-  statistics: string[];
-
-  /** 
-   * Optional. The last EV calculation result attached by the EV Calculator.
-   * If not calculated yet or invalid, this will be null.
-   */
-  lastEvResult?: EVResult | null;
-}
-
-interface EVResult {
-  p_player: number;       // Probability of Player win (0.0 to 1.0)
-  p_banker: number;       // Probability of Banker win (0.0 to 1.0)
-  p_tie: number;          // Probability of Tie win (0.0 to 1.0)
-  ev_player_base: number; // Base EV for Player bet
-  ev_banker_base: number; // Base EV for Banker bet
-  ev_player: number;      // Adjusted EV for Player (with rebate applied)
-  ev_banker: number;      // Adjusted EV for Banker (with rebate applied)
-  ev_tie: number;         // Adjusted EV for Tie (with rebate applied)
-  rebate: number;         // Rebate rate used for calculations (e.g., 0.012)
-  remaining: number;      // Total remaining cards in the active shoe
-  best: {                 // Recommends the highest EV bet target exceeding minimum threshold
-    target: "Player" | "Banker";
-    ev: number;
-    prob: number;
-  } | null;               // Null if no edge exceeds threshold
+### 3. State Update Broadcast
+Whenever a new packet is captured or a store update triggers, the interceptor must immediately write it to `window.__tableStatesCache` and pass the parsed result to the bridge callback:
+```javascript
+const parsed = getParsedTable(roomId);
+if (parsed && typeof window.onTableStateUpdate === "function") {
+  window.onTableStateUpdate(parsed);
 }
 ```
 
 ---
 
-## 🎴 Card Normalization Rules
+## 📋 The Standardized Output Schema (`StandardizedTableState`)
 
-To ensure correct card identification and hand evaluation, card strings must follow a strict representation scheme:
+The parser function `getParsedTable(roomId)` must convert raw packets into a clean, game-agnostic state object containing these exact properties:
+
+| Property | Type | Required | Description | Example |
+| :--- | :--- | :---: | :--- | :--- |
+| **`tableName`** | `string` | **Yes** | Friendly name used as the primary map identifier in the database. | `"PrettyMG05"` |
+| **`tableId`** | `string` / `null` | **Yes** | Database lookup or API room identifier string. | `"BAC-005"` |
+| **`state`** | `string` | **Yes** | Normalized active phase: `"Waiting for Bets"`, `"Dealing"`, `"Result"`, `"Shuffling"`. | `"Waiting for Bets"` |
+| **`round`** | `number` | **Yes** | 1-based index representing the current shoe round count. Must be $> 0$ (unless `"Shuffling"`). | `18` |
+| **`timer`** | `number` | **Yes** | Remaining betting seconds. Provide `-1` if betting is closed or inactive. | `15` |
+| **`wins`** | `object` | **Yes** | Win totals matching `{ P: number, B: number, T: number }`. | `{ P: 8, B: 7, T: 3 }` |
+| **`playerCards`** | `string[]` | **Yes** | Array of normalized cards dealt to the Player hand (if any). | `["8D", "7H"]` |
+| **`bankerCards`** | `string[]` | **Yes** | Array of normalized cards dealt to the Banker hand (if any). | `["9S", "QD"]` |
+| **`allCards`** | `string[]` | **Yes** | Combined array of all cards dealt during this round. | `["8D", "7H", "9S", "QD"]` |
+| **`winner`** | `string` / `null` | **Yes** | Final outcome letter: `"P"` (Player), `"B"` (Banker), `"T"` (Tie), or `null`. | `"B"` |
+| **`winPoints`** | `number` / `null` | No | Total hand value/points representing the winning score. | `9` |
+| **`statistics`** | `string[]` | **Yes** | Raw or standard bead road outcome strings representing past rounds. | `["p_8", "b_5", "t_6"]` |
+
+---
+
+## ⏱️ Standardizing Game States
+
+To prevent localized telemetry failures or validation errors, you must map all provider-specific state words to these four normalized states:
+
+1. **`"Waiting for Bets"`**
+   * Betting is active and open. This state initializes new EV calculations and counts down the placement timer.
+2. **`"Dealing"`**
+   * Betting has closed. The dealer is currently distributing cards. 
+3. **`"Result"`** (or `"Result [Suffix]"`)
+   * Outcomes are being determined. Cards are finalized, payouts are evaluated, and telemetry signals are stored.
+4. **`"Shuffling"`**
+   * The current shoe has completed. Clears active shoe composition state and resets historical counters.
+
+---
+
+## 🎴 Card Normalization Protocol
+
+Cards parsed by the interceptor are subtracted directly from a shared 13-slot deck composition inside `tableManager.js`. Therefore, you must normalize card strings:
 
 > [!IMPORTANT]
-> **Syntax Pattern**: `[Rank][Suit]` (e.g., `"AH"`, `"9D"`, `"TC"`, `"KS"`)
-
-1. **Rank Representation**:
-   * Must be a single uppercase character.
-   * `A` = Ace, `2`-`9` = Numeric ranks, `T` = **10** (Normalized to "T" so all ranks are single-character), `J` = Jack, `Q` = Queen, `K` = King.
-   * **Rule Exception**: Ten MUST be represented as `T`, never `10`. This allows `tableManager.js` to parse card components simply by slicing the last character as the suit: `cardName.slice(0, -1)`.
-
-2. **Suit Representation**:
-   * Must be a single uppercase character matching the standard suits:
-     * `H` = Hearts
-     * `D` = Diamonds
-     * `C` = Clubs
-     * `S` = Spades
-
-3. **Filtering**:
-   * Any empty cards, placeholders, or invalid values (e.g., `"null"`, `"Red"`, `undefined`, `null`) **must** be filtered out from the card arrays before sending them to `tableManager.js`.
-
-### 🧮 Deck Composition & EV Mapping
-
-The card normalization directly feeds the EV calculation engine in [evCalculator.js](file:///c:/Users/desmo/Desktop/v5-template/eyes/evCalculator.js). The Rust-based analyzer requires a 13-slot integer array representing the counts of remaining cards for each rank in the shoe.
-
-The single-character normalized ranks map directly to composition array indices as follows:
-
-| Index | Rank | Description | Example Standardized Cards |
-| :--- | :--- | :--- | :--- |
-| **0** | `A` | Ace | `"AH"`, `"AD"`, `"AC"`, `"AS"` |
-| **1** | `2` | Two | `"2H"`, `"2D"`, `"2C"`, `"2S"` |
-| **2** | `3` | Three | `"3H"`, `"3D"`, `"3C"`, `"3S"` |
-| **3** | `4` | Four | `"4H"`, `"4D"`, `"4C"`, `"4S"` |
-| **4** | `5` | Five | `"5H"`, `"5D"`, `"5C"`, `"5S"` |
-| **5** | `6` | Six | `"6H"`, `"6D"`, `"6C"`, `"6S"` |
-| **6** | `7` | Seven | `"7H"`, `"7D"`, `"7C"`, `"7S"` |
-| **7** | `8` | Eight | `"8H"`, `"8D"`, `"8C"`, `"8S"` |
-| **8** | `9` | Nine | `"9H"`, `"9D"`, `"9C"`, `"9S"` |
-| **9** | `T` | Ten | `"TH"`, `"TD"`, `"TC"`, `"TS"` |
-| **10**| `J` | Jack | `"JH"`, `"JD"`, `"JC"`, `"JS"` |
-| **11**| `Q` | Queen | `"QH"`, `"QD"`, `"QC"`, `"QS"` |
-| **12**| `K` | King | `"KH"`, `"KD"`, `"KC"`, `"KS"` |
-
-Correct normalization is vital; a single parsing failure (e.g., passing `"10S"` instead of `"TS"`) will cause composition misalignment and invalidate all generated downstream EV calculations.
+> **Format Rule**: `[Rank][Suit]` (e.g. `"AD"`, `"7H"`, `"TS"`, `"KC"`)
+> * **Rank**: Single uppercase character. Ranks `2`-`9`, `A` (Ace), `J` (Jack), `Q` (Queen), `K` (King).
+> * **The Ten Rule**: Ten **must** be represented as `"T"`, never `"10"`.
+> * **Suit**: Single uppercase character. `H` (Hearts), `D` (Diamonds), `C` (Clubs), `S` (Spades).
+> * **Filtering**: All empty placeholder strings (like `"null"`, `"Red"`, `undefined`) **must** be filtered out from the final arrays.
 
 ---
 
-## ⏱️ Game State Conventions
+## ⚙️ Generic Interceptor Implementation Blueprint
 
-The game state machine relies on these exact string states to track game phases:
+Here is a modular template designed to intercept standard browser technologies (WebSockets, Socket.IO, Pinia stores) and convert them to the expected global schema.
 
-| Phase | State Value | Details |
-| :--- | :--- | :--- |
-| **Betting Active** | `"Waiting for Bets"` | Activates EV calculations, bet timers, and accepts placements. |
-| **Betting Closed / Action** | `"Dealing"` | Cards are being dealt. Bets are no longer accepted. |
-| **Settlement** | `"Result"` or `"Result[Suffix]"` | Triggers outcome evaluation, payouts, and saves telemetry signals. |
-| **Shoe Reset** | `"Shuffling"` | Clears active shoe state, resets round counters. |
+```javascript
+(function () {
+  // 1. Establish cache layers
+  window.__tableStatesCache = window.__tableStatesCache || {};
+  window.__roomToNameMap = window.__roomToNameMap || {};
 
----
+  // 2. Extract Token / Auth helpers if needed for API fetches
+  function getAuthToken() {
+    // Look through localStorage / sessionStorage / cookies
+    return null; 
+  }
 
-## 🛠️ Step-by-Step: Integrating a New Game Type
+  // 3. Normalized card converter helper
+  function normalizeCard(code) {
+    if (!code || code === "null" || code === "Red") return null;
+    if (code.startsWith("10")) return "T" + code.slice(2);
+    return code.toUpperCase();
+  }
 
-If you are adding a new game type (e.g., Roulette, Dragon Tiger, Sic Bo) under the `eyes` module, follow this integration pipeline:
+  // 4. Required bridge translation function
+  window.getParsedTable = function(roomId) {
+    const rawEntry = window.__tableStatesCache[roomId];
+    if (!rawEntry) return null;
 
-```mermaid
-graph TD
-    A[Launch Browser & Initialize Session] --> B[Capture WS/REST Packets in Interceptor]
-    B --> C[Map Raw Room IDs to Table Names]
-    C --> D[Extract Raw Game Round & State Information]
-    D --> E[Normalize Cards using [Rank][Suit] Format]
-    E --> F[Construct StandardizedTableState Output]
-    F --> G[Inject state to tableManager.js via Event Dispatch]
+    // TODO: Map provider-specific properties to the StandardizedTableState contract
+    return {
+      tableName: window.__roomToNameMap[roomId] || roomId,
+      tableId: roomId,
+      state: normalizeState(rawEntry.status), // e.g. "Waiting for Bets"
+      round: parseInt(rawEntry.roundNo, 10) || 0,
+      timer: rawEntry.timeLeft ?? -1,
+      wins: calculateWins(rawEntry.statistics),
+      playerCards: (rawEntry.cards?.player || []).map(normalizeCard).filter(Boolean),
+      bankerCards: (rawEntry.cards?.banker || []).map(normalizeCard).filter(Boolean),
+      allCards: [], // playerCards + bankerCards
+      winner: extractWinner(rawEntry),
+      statistics: rawEntry.statistics || []
+    };
+  };
+
+  // 5. Broadcast updates to Puppeteer Bridge
+  function savePacketAndEmit(roomId, rawPacket) {
+    window.__tableStatesCache[roomId] = {
+      ...window.__tableStatesCache[roomId],
+      ...rawPacket
+    };
+
+    if (typeof window.onTableStateUpdate === "function") {
+      try {
+        const parsed = window.getParsedTable(roomId);
+        if (parsed) {
+          window.onTableStateUpdate(parsed);
+        }
+      } catch (err) {
+        console.error("Bridge emit error:", err);
+      }
+    }
+  }
+
+  // 6. Network Interception Layers
+  // A. Hook standard WebSockets
+  if (!WebSocket.prototype.send.isHooked) {
+    const originalWsSend = WebSocket.prototype.send;
+    WebSocket.prototype.send = function (data) {
+      if (!this._hooked) {
+        this._hooked = true;
+        this.addEventListener('message', function (event) {
+          try {
+            const rawMessage = JSON.parse(event.data);
+            if (rawMessage && rawMessage.roomId) {
+              savePacketAndEmit(rawMessage.roomId, rawMessage);
+            }
+          } catch (e) {}
+        });
+      }
+      return originalWsSend.apply(this, arguments);
+    };
+    WebSocket.prototype.send.isHooked = true;
+  }
+
+  // B. Hook Pinia / Vue State Manager Stores
+  function hookPinia() {
+    try {
+      const pinia = window.$nuxt?.$pinia || window.$pinia || document.querySelector('#app')?.__vue_app__?.$pinia;
+      if (pinia && pinia._s) {
+        for (const storeKey of Object.keys(pinia._s)) {
+          if (storeKey.toLowerCase().includes('game') || storeKey.toLowerCase().includes('table')) {
+            const store = pinia._s[storeKey];
+            // Hook mutations / setters
+            if (store && store.setTableState && !store.setTableState.isHooked) {
+              const original = store.setTableState;
+              store.setTableState = function (roomId, packet) {
+                savePacketAndEmit(roomId, packet);
+                return original.apply(this, arguments);
+              };
+              store.setTableState.isHooked = true;
+            }
+          }
+        }
+      }
+    } catch (e) {}
+  }
+
+  // Monitor store injection periodically
+  setInterval(hookPinia, 4000);
+})();
 ```
 
-### 1. Launch Browser & Initialize Session
-Before intercepting packets, the browser context must launch the target game lobby and establish an active authenticated session. 
-* Use the reusable lobby login structure as implemented in [demoLogin.js](file:///c:/Users/desmo/Desktop/v5-template/eyes/demoLogin.js) as a blueprint.
-* The utility handles opening a new page, navigating to the Cloudfront lobby URL, waiting for the page to reach `networkidle2`, and validating that no crash/error dialogs are active via `checkPageErrors`.
-
-### 2. Intercept Raw Network Packets
-Use the existing WebSocket / Socket.io hook inside [interceptor.js](file:///c:/Users/desmo/Desktop/v5-template/eyes/interceptor.js) to catch network packets sent from the game server.
-
-### 3. Map Room IDs
-Ensure there is a translation map (like `window.__roomToNameMap`) mapping the raw server room ID to a clean user-friendly table name (e.g., `BAC-005` to `PrettyMG05`).
-
-### 4. Normalize & Package
-Implement a translator inside the client-side module to convert the raw JSON data into the `StandardizedTableState` contract. Ensure cards match the `[Rank][Suit]` rule so that they correctly subtract from the 13-slot deck composition.
-
-### 5. Dispatch to State Manager
-Ensure the event listener in [runEyes.js](file:///c:/Users/desmo/Desktop/v5-template/eyes/runEyes.js) captures the output and sends it directly to `tableManager.js` to trigger automated system telemetry and EV calculations.
