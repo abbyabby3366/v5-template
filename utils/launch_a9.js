@@ -139,6 +139,8 @@ function buildAccountConfig(accountIndex, accountsFilePath) {
     label: account.label || `Account ${accountIndex}`,
     platform,
     sessionRestartMinutes: account.sessionRestartMinutes || 0,
+    betType: account.betType || "variable",
+    allowedFixedAmounts: account.allowedFixedAmounts || [5000, 10000, 15000, 20000],
     chrome: {
       executablePath: process.env.CHROME_EXECUTABLE_PATH || "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
       userDataDir: process.env.CHROME_USER_DATA_DIR

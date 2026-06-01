@@ -690,7 +690,10 @@
 
                  const balanceText = a.balance != null ? `<span style="color:var(--text);margin-right:10px;">Balance: <strong style="color:var(--green)">${a.balance}</strong></span>` : '';
                  const ipText = a.ip ? `<span style="color:var(--dim);margin-left:8px;font-size:0.9em;">(${a.ip})</span>` : '';
-                 acctHtml += `<div class="acct-row">${balanceText}<span style="color:${readyColor};font-weight:600;">${readyText}</span>${ipText}</div>`;
+                 const betTypeColor = a.betType === 'fixed' ? 'var(--orange)' : 'var(--blue)';
+                 const betTypeLabel = a.betType === 'fixed' ? 'Fixed' : 'Variable';
+                 const betTypeText = `<span style="color:${betTypeColor};margin-left:8px;font-size:0.85em;font-weight:600;border:1px solid ${betTypeColor};padding:0 4px;border-radius:2px;">${betTypeLabel}</span>`;
+                 acctHtml += `<div class="acct-row">${balanceText}<span style="color:${readyColor};font-weight:600;">${readyText}</span>${ipText}${betTypeText}</div>`;
               }
             } else {
               acctHtml = `<div class="acct-row" style="color:var(--dim)">No accounts configured</div>`;
