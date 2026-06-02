@@ -1,5 +1,5 @@
 const config = require("./config");
-const { TableStateManager } = require("./tableManager");
+const { TableStateManager, cardRankToIndex } = require("./tableManager");
 const { processEVForEvents } = require("./evCalculator");
 const { handleTelemetrySignals } = require("./telemetryClient");
 const { loadState, saveState, writeDashboardJson } = require("./statePersistence");
@@ -21,6 +21,86 @@ process.on("SIGINT", () => { saveState(stateManager, eventLog); process.exit(0);
 process.on("SIGTERM", () => { saveState(stateManager, eventLog); process.exit(0); });
 
 // ─── Event-Driven Engine ─────────────────────────────────────────────────
+
+async function syncActualDeckComposition(page, table) {
+  if (!page || page.isClosed()) return;
+  try {
+    const history = await page.evaluate((id) => {
+      if (typeof window.getActualDeckCompositionHistory === 'function') {
+        return window.getActualDeckCompositionHistory(id);
+      }
+      return null;
+    }, table.tableId || table.tableName);
+
+    if (!history || !Array.isArray(history) || history.length === 0) return;
+
+    const ts = stateManager.getTable(table.tableName);
+    if (!ts) return;
+
+    // 1. Filter out completed rounds (shoeNos < table.round)
+    const validRounds = history.filter(r => {
+      return r && r.shoeNos && r.cards &&
+             (r.cards.player.length > 0 || r.cards.banker.length > 0) &&
+             (table.round > 0 && r.shoeNos < table.round);
+    });
+
+    validRounds.sort((a, b) => a.shoeNos - b.shoeNos);
+
+    // 2. Reconstruct actual composition by subtracting cards chronologically
+    const fresh = [32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32];
+    for (const r of validRounds) {
+      const allCards = [...(r.cards.player || []), ...(r.cards.banker || [])];
+      for (const card of allCards) {
+        const idx = cardRankToIndex(card);
+        if (idx >= 0 && fresh[idx] > 0) {
+          fresh[idx]--;
+        }
+      }
+    }
+
+    ts.actualDeckComposition = [...fresh];
+
+    // 3. Compute real-time composition by subtracting current active round cards
+    const realTimeComp = [...fresh];
+    const visibleCards = [...(table.playerCards || []), ...(table.bankerCards || [])].filter(c => c !== "Red");
+    for (const card of visibleCards) {
+      const idx = cardRankToIndex(card);
+      if (idx >= 0 && realTimeComp[idx] > 0) {
+        realTimeComp[idx]--;
+      }
+    }
+
+    // 4. Auto-healing comparison: Check mismatch in "Waiting for Bets"
+    const isTransitioning = ts.lastFinalizedRound > 0 && table.round > ts.lastFinalizedRound;
+    const remainingCards = ts.deckComposition.reduce((a, b) => a + b, 0);
+
+    if (table.state === "Waiting for Bets" && !isTransitioning && remainingCards < 416) {
+      let isDiff = false;
+      for (let i = 0; i < 13; i++) {
+        if (ts.deckComposition[i] !== realTimeComp[i]) {
+          isDiff = true;
+          break;
+        }
+      }
+
+      if (isDiff) {
+        const oldComp = [...ts.deckComposition];
+        ts.deckComposition = [...realTimeComp]; // Auto-heal!
+
+        if (!ts.hasWarnedMismatch) {
+          ts.hasWarnedMismatch = true;
+          const msg = `[AUTO-HEAL] Table ${table.tableName}: Deck mismatch detected at round ${table.round}. Reactive composition: [${oldComp.join(', ')}] vs History composition: [${realTimeComp.join(', ')}]. Syncing deck.`;
+          console.log(`\x1b[32m${msg}\x1b[0m`);
+          sendWhatsAppNotification(msg).catch(err => console.error("WhatsApp Notification failed:", err));
+        }
+      } else {
+        ts.hasWarnedMismatch = false;
+      }
+    }
+  } catch (err) {
+    console.error(`[syncActualDeckComposition] Error for ${table.tableName}:`, err.message);
+  }
+}
 
 async function runEventBasedEyes(pageRef, extractorCode, acctConfig) {
   let processing = false;
@@ -45,6 +125,9 @@ async function runEventBasedEyes(pageRef, extractorCode, acctConfig) {
         for (const table of batch) {
           latestScrapedTables.set(table.tableName, table);
           if (ignoredTables.includes(table.tableName)) continue;
+
+          // Align actual deck composition and run auto-healing check
+          await syncActualDeckComposition(activePage, table);
 
           const events = stateManager.update([table]);
           if (events.length === 0) continue;

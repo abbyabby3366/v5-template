@@ -55,14 +55,16 @@ async function sendTelemetry(payload, typeLabel = "TELEMETRY") {
  * @param {string} winner - "P", "B", "T", or "UNKNOWN"
  * @param {number} deckRemaining
  */
-function sendRoundOutcome(betId, tableName, round, winner, deckRemaining) {
+function sendRoundOutcome(betId, tableName, round, winner, deckRemaining, ts) {
+  const useActual = String(process.env.USE_ACTUAL_DECK_COMPOSITION).toLowerCase() === 'true';
+  const actualRemaining = ts && ts.actualDeckComposition ? ts.actualDeckComposition.reduce((a, b) => a + b, 0) : deckRemaining;
   const payload = {
     uuid: betId,
     instanceID: "PG_Eyes",
     tableNumber: tableName,
     status: { setup: "READY", autoBet: true, gameState: "ROUND_COMPLETE" },
     ocr: { roundNumber: String(round), winner: winner || "UNKNOWN" },
-    metrics: { deckRemaining },
+    metrics: { deckRemaining: useActual ? actualRemaining : deckRemaining },
     mathematics: {}
   };
   sendTelemetry(payload, "ROUND RESULTS");
@@ -77,15 +79,18 @@ function sendRoundOutcome(betId, tableName, round, winner, deckRemaining) {
 function sendBetSignal(ts, tableName, stateManager) {
   ts.currentBetId = crypto.randomUUID();
 
+  const useActual = String(process.env.USE_ACTUAL_DECK_COMPOSITION).toLowerCase() === 'true';
+  const actualRemaining = ts.actualDeckComposition ? ts.actualDeckComposition.reduce((a, b) => a + b, 0) : ts.remaining;
+
   const betPayload = {
     uuid: ts.currentBetId,
     instanceID: "PG_Eyes",
     tableNumber: tableName,
     status: { setup: "READY", autoBet: true, gameState: "WAITING_FOR_BETS" },
     ocr: { roundNumber: String(ts.round) },
-    metrics: { deckRemaining: ts.remaining },
+    metrics: { deckRemaining: useActual ? actualRemaining : ts.remaining },
     mathematics: {
-      deckComposition: ts.deckComposition,
+      deckComposition: useActual && ts.actualDeckComposition ? ts.actualDeckComposition : ts.deckComposition,
       evSnapshot: {
         "PlayerBet": { ev: ts.lastEvResult.ev_player, prob: ts.lastEvResult.p_player },
         "BankerBet": { ev: ts.lastEvResult.ev_banker, prob: ts.lastEvResult.p_banker },
@@ -132,7 +137,7 @@ function handleTelemetrySignals(events, stateManager) {
 
     // 2. Round outcomes
     if (event.type === "HAND_COMPLETE" && ts.currentBetId) {
-      sendRoundOutcome(ts.currentBetId, event.tableName, event.round, event.winner, event.deckRemaining || ts.remaining);
+      sendRoundOutcome(ts.currentBetId, event.tableName, event.round, event.winner, event.deckRemaining || ts.remaining, ts);
       ts.currentBetId = null;
     }
 

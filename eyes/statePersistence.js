@@ -110,6 +110,8 @@ async function writeDashboardJson(tables, stateManager, timestamp, events, allSc
       previousState: ts?.state ?? null,
       deckRemaining: ts?.remaining ?? null,
       deckComposition: deck ?? null,
+      actualDeckComposition: ts?.actualDeckComposition ?? null,
+      actualDeckRemaining: ts?.actualDeckComposition ? ts.actualDeckComposition.reduce((a, b) => a + b, 0) : null,
       deckLabelled: deck ? Object.fromEntries(
         ["A", "2", "3", "4", "5", "6", "7", "8", "9", "T", "J", "Q", "K"].map((r, i) => [r, deck[i]])
       ) : null,

@@ -5,6 +5,12 @@
   window.__roomToNameMap = window.__roomToNameMap || {};
   window.__tableStatesCache = window.__tableStatesCache || {};
   window.__activeRooms = window.__activeRooms || new Set();
+  window.__deckCompositionHistoryCache = window.__deckCompositionHistoryCache || {};
+
+  window.getActualDeckCompositionHistory = function (roomId) {
+    const cache = window.__deckCompositionHistoryCache || {};
+    return cache[roomId] || [];
+  };
 
   function getAuthToken() {
     for (let i = 0; i < localStorage.length; i++) {
@@ -281,6 +287,44 @@
       statistics: stats,
       round: roundCount
     };
+
+    // Cache completed cards in window.__deckCompositionHistoryCache
+    const activeRound = roundCount || 0;
+    const historyCache = window.__deckCompositionHistoryCache = window.__deckCompositionHistoryCache || {};
+    if (!historyCache[packet.roomId]) {
+      historyCache[packet.roomId] = [];
+    }
+
+    if (packet.status === "Shuffle" || (packet.status === "CountDown" && activeRound === 1)) {
+      historyCache[packet.roomId] = [];
+    } else if (packet.status === "PayOut" && packet.result && packet.result.rsBc && activeRound > 0) {
+      const rs = packet.result.rsBc;
+      const normalizeCard = (c) => {
+        if (!c || c === "null" || c === "Red") return null;
+        if (c.startsWith("10")) return "T" + c.slice(2);
+        return c.toUpperCase();
+      };
+      const pCards = [rs.player_1, rs.player_2, rs.player_3].map(normalizeCard).filter(Boolean);
+      const bCards = [rs.banker_1, rs.banker_2, rs.banker_3].map(normalizeCard).filter(Boolean);
+      
+      let winner = "tie";
+      if (rs.player123 !== undefined && rs.banker123 !== undefined) {
+        if (rs.player123 > rs.banker123) winner = "player";
+        else if (rs.player123 < rs.banker123) winner = "banker";
+      }
+
+      if (!historyCache[packet.roomId].some(r => r.shoeNos === activeRound)) {
+        historyCache[packet.roomId].push({
+          shoeNos: activeRound,
+          winnerSide: winner,
+          cards: {
+            player: pCards,
+            banker: bCards
+          }
+        });
+        historyCache[packet.roomId].sort((a, b) => a.shoeNos - b.shoeNos);
+      }
+    }
 
     if (statusChanged && packet.status === "CountDown") {
       syncSourceBeadRoad(packet.roomId);

@@ -112,6 +112,7 @@ async function calculateEV(composition, config = {}) {
 }
 
 async function processEVForEvents(events, dynamicConfig = {}) {
+  const useActual = String(process.env.USE_ACTUAL_DECK_COMPOSITION).toLowerCase() === 'true';
   for (const event of events) {
     if (event.type !== "HAND_COMPLETE" && event.type !== "STATE_CHANGE") continue;
 
@@ -120,7 +121,9 @@ async function processEVForEvents(events, dynamicConfig = {}) {
     if (hasReset) continue;
 
     const ts = event.tableState;
-    const evResult = await calculateEV(event.deckComposition, dynamicConfig);
+    const compToUse = useActual && ts.actualDeckComposition ? ts.actualDeckComposition : event.deckComposition;
+
+    const evResult = await calculateEV(compToUse, dynamicConfig);
     if (evResult) {
       ts.lastEvResult = evResult;
     }

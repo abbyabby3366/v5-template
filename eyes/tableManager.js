@@ -79,6 +79,8 @@ class TableState {
     this.lastVerifiedMismatchRound = null;
     this.lastWarnedEvRound = null;
     this.lastWarnedMissedRound = null;
+    this.actualDeckComposition = freshShoe();
+    this.hasWarnedMismatch = false;
   }
 
   get remaining() {
@@ -345,6 +347,8 @@ class TableStateManager {
     ts.lastVerifiedMismatchRound = null;
     ts.lastWarnedEvRound = null;
     ts.lastWarnedMissedRound = null;
+    ts.actualDeckComposition = freshShoe();
+    ts.hasWarnedMismatch = false;
 
     if (isInvalidStateReset(reason)) {
       ts.lastErrorResetReason = reason;
@@ -381,6 +385,8 @@ class TableStateManager {
         lastVerifiedMismatchRound: ts.lastVerifiedMismatchRound,
         lastWarnedEvRound: ts.lastWarnedEvRound,
         lastWarnedMissedRound: ts.lastWarnedMissedRound,
+        actualDeckComposition: ts.actualDeckComposition,
+        hasWarnedMismatch: ts.hasWarnedMismatch,
       };
     }
     return data;
@@ -409,6 +415,8 @@ class TableStateManager {
       ts.lastVerifiedMismatchRound = saved.lastVerifiedMismatchRound || null;
       ts.lastWarnedEvRound = saved.lastWarnedEvRound || null;
       ts.lastWarnedMissedRound = saved.lastWarnedMissedRound || null;
+      ts.actualDeckComposition = saved.actualDeckComposition || freshShoe();
+      ts.hasWarnedMismatch = saved.hasWarnedMismatch || false;
 
       // Support restoring from old format (deducedBeadRoad) or new (handHistory)
       const rawHistory = saved.handHistory || saved.deducedBeadRoad || [];
