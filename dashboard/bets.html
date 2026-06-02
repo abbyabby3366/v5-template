@@ -52,10 +52,7 @@
     .reason-truncate:hover {color:var(--cyan);}
     .reason-truncate.expanded {white-space:normal;overflow:visible;text-overflow:unset;max-width:none;}
 
-    @media (max-width: 768px) {
-      .reason-truncate {white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;}
-      .col-details, .col-table {display:none;}
-    }
+
 
     .modules-panel { padding: 12px; background: #0d1117; border-bottom: 1px solid var(--border); display: flex; gap: 12px; flex-wrap: wrap; }
     .module-card { background: var(--card); border: 1px solid var(--border); padding: 8px 12px; border-radius: 6px; min-width: 200px; }
@@ -76,6 +73,60 @@
     .btn { padding:6px 12px; border:none; border-radius:4px; cursor:pointer; font-family:inherit; font-weight:600; }
     .btn-primary { background:var(--cyan); color:#000; }
     .btn-secondary { background:#0d1117; color:var(--text); border:1px solid var(--border); }
+
+    @media (max-width: 768px) {
+      .reason-truncate {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 220px;
+      }
+      .col-details, .col-table {
+        display: none;
+      }
+      .modules-panel {
+        flex-wrap: nowrap !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 8px;
+      }
+      .modules-panel::-webkit-scrollbar {
+        height: 4px;
+      }
+      .modules-panel::-webkit-scrollbar-track {
+        background: #0d1117;
+      }
+      .modules-panel::-webkit-scrollbar-thumb {
+        background: var(--border);
+        border-radius: 2px;
+      }
+      .modules-panel::-webkit-scrollbar-thumb:hover {
+        background: var(--cyan);
+      }
+      .module-card {
+        flex-shrink: 0 !important;
+      }
+      .bar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+        padding: 10px 12px;
+      }
+      .bar .meta {
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: flex-start;
+      }
+      .bar .meta label,
+      .bar .meta button {
+        margin-left: 0 !important;
+      }
+      .main > div:first-child {
+        flex-wrap: wrap;
+        justify-content: flex-start !important;
+        gap: 6px;
+      }
+    }
   </style>
 </head>
 <body>
