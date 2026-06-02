@@ -7,7 +7,9 @@ require("dotenv").config({ path: require("path").resolve(__dirname, "..", ".env"
 const puppeteer = require("puppeteer");
 const path = require("path");
 const fs = require("fs");
-const { spawn } = require("child_process");
+const { spawn, exec } = require("child_process");
+const util = require("util");
+const execAsync = util.promisify(exec);
 const { getBrowserArgs } = require("./browserArgs");
 const { verifyProxyIp } = require("./proxy_verifier");
 
@@ -21,6 +23,29 @@ function writeLoginTimestamp(label) {
   timestamps[label] = Date.now();
   try { fs.writeFileSync(LOGIN_TIMESTAMPS_FILE, JSON.stringify(timestamps, null, 2)); } catch (e) {}
   return timestamps[label];
+}
+
+async function killZombieChromeOnPort(port, logger) {
+  const targetFlag = `--remote-debugging-port=${port}`;
+  try {
+    const psCommand = [
+      `Get-CimInstance Win32_Process -Filter "Name='chrome.exe'"`,
+      `| Where-Object { $_.CommandLine -like '*${targetFlag}*' -and $_.CommandLine -notlike '*--type=*' }`,
+      `| Select-Object -ExpandProperty ProcessId`,
+    ].join(" ");
+    const { stdout } = await execAsync(
+      `powershell -NoProfile -NonInteractive -Command "${psCommand}"`,
+      { encoding: "utf8", timeout: 10000 },
+    );
+    const pids = stdout.split(/\r?\n/).map((s) => parseInt(s.trim(), 10)).filter((n) => !isNaN(n) && n > 0);
+    if (pids.length === 0) return;
+    for (const pid of pids) {
+      try {
+        logger.warn(`Found zombie Chrome (PID ${pid}) with ${targetFlag}. Killing...`);
+        await execAsync(`taskkill /PID ${pid} /F /T`, { timeout: 5000 });
+      } catch (e) {}
+    }
+  } catch (e) {}
 }
 
 const TIMEOUTS = {
@@ -150,6 +175,8 @@ async function launchAccount(acctConfig) {
         logger.log("Connected to existing Chrome instance.");
       } catch (e) {
         logger.log("Chrome not found on debugging port. Spawning new instance...");
+        await killZombieChromeOnPort(chrome.remoteDebuggingPort, logger);
+        await new Promise(r => setTimeout(r, 500));
         try {
           const lockFile = require("path").join(chrome.userDataDir, "lockfile");
           if (require("fs").existsSync(lockFile)) {
