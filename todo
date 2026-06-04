@@ -6,3 +6,7 @@ check if web socket disconnect, if yes, notify
 VPN as proxy✅
 
 check if got to bet live table mapping
+eyes stale state, 15 seconds restartr✅
+
+
+readiness and liveliness check

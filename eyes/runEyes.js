@@ -107,6 +107,7 @@ async function runEventBasedEyes(pageRef, extractorCode, acctConfig) {
   let runAgain = false;
   let eventQueue = [];
   let activePage = null;
+  let lastUpdateTime = Date.now();
 
   async function triggerTick() {
     if (processing) { runAgain = true; return; }
@@ -181,6 +182,7 @@ async function runEventBasedEyes(pageRef, extractorCode, acctConfig) {
     // Bridge: browser → Node.js
     await page.exposeFunction("onTableStateUpdate", async (table) => {
       if (pageRef.current !== page) return; // Ignore updates from swapped/old pages
+      lastUpdateTime = Date.now(); // Reset staleness watchdog
       if (table && table.tableName) {
         eventQueue.push(table);
         await triggerTick();
@@ -215,6 +217,9 @@ async function runEventBasedEyes(pageRef, extractorCode, acctConfig) {
     } catch (err) {
       console.warn("[runEyes] Initial priming failed on page. Relying on live events.");
     }
+
+    // Reset staleness watchdog after page setup/swap
+    lastUpdateTime = Date.now();
   }
 
   // Setup initial page
@@ -265,7 +270,25 @@ async function runEventBasedEyes(pageRef, extractorCode, acctConfig) {
 
   bindCloseListener(pageRef.current);
 
+  // ─── Staleness Watchdog ──────────────────────────────────────────────────
+  // If no game state update received for 15 seconds, the interceptor has
+  // likely disconnected. Trigger a full restart via the supervisor loop.
+  const STALENESS_TIMEOUT_MS = 15000;
+  const stalenessWatchdog = setInterval(() => {
+    const silentMs = Date.now() - lastUpdateTime;
+    if (silentMs >= STALENESS_TIMEOUT_MS) {
+      const silentSec = (silentMs / 1000).toFixed(1);
+      const msg = `[Staleness Watchdog] No game state updates for ${silentSec}s on "${acctConfig?.label || 'Eyes'}". Interceptor disconnected — restarting session.`;
+      console.error(`\x1b[31m${msg}\x1b[0m`);
+      sendWhatsAppNotification(msg).catch(err => console.error("Notification failed:", err.message));
+      clearInterval(stalenessWatchdog);
+      if (pageRef.current) pageRef.current.closeReason = msg;
+      exitResolved(new Error(msg));
+    }
+  }, 5000);
+
   await exitPromise;
+  clearInterval(stalenessWatchdog);
   return false;
 }
 
