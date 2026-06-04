@@ -54,6 +54,8 @@ let cachedSuccessRates = {
   moduleLast1000: {}
 };
 
+let lastSuccessBetTime = null;
+
 async function updateSuccessRates() {
   if (!dbCollection) return;
   try {
@@ -128,6 +130,66 @@ async function updateSuccessRates() {
     };
   } catch (e) {
     console.error("[Stats] Failed to update success rates:", e.message);
+  }
+}
+
+async function updateSuccessRatesQuick() {
+  if (!dbCollection) return;
+  try {
+    const validOutcomes = ["SUCCESS", "WRONG_AMOUNT", "UNPLACED", "NETWORK_ERROR", "DISPATCH_FAILED", "FAILED"];
+    const successOutcomes = ["SUCCESS"];
+
+    const bets = await dbCollection
+      .find({ outcome: { $in: validOutcomes } })
+      .sort({ time: -1 })
+      .limit(1000)
+      .project({ outcome: 1 })
+      .toArray();
+
+    let s100 = 0, t100 = 0;
+    let s1000 = 0, t1000 = bets.length;
+
+    for (let i = 0; i < bets.length; i++) {
+      const b = bets[i];
+      const isSuccess = successOutcomes.includes(b.outcome);
+      if (isSuccess) {
+        if (i < 100) s100++;
+        s1000++;
+      }
+      if (i < 100) {
+        t100++;
+      }
+    }
+
+    let moduleRates = {};
+    for (const m of activeModules.values()) {
+      let headerLabel = m.label;
+      if (m.accounts && m.accounts.length > 0 && m.accounts[0].label) {
+        headerLabel = m.accounts[0].label;
+      }
+
+      const modBets = await dbCollection.find({
+        outcome: { $in: validOutcomes },
+        $or: [
+          { targetModuleId: m.moduleId },
+          { targetModule: headerLabel },
+          { targetModule: m.label }
+        ]
+      }).sort({ time: -1 }).limit(1000).project({ outcome: 1 }).toArray();
+
+      let ms = 0;
+      let mt = modBets.length;
+      for (const mb of modBets) {
+        if (successOutcomes.includes(mb.outcome)) ms++;
+      }
+      moduleRates[headerLabel] = mt > 0 ? (ms / mt) : null;
+    }
+
+    cachedSuccessRates.last100 = t100 > 0 ? (s100 / t100) : null;
+    cachedSuccessRates.last1000 = t1000 > 0 ? (s1000 / t1000) : null;
+    cachedSuccessRates.moduleLast1000 = moduleRates;
+  } catch (e) {
+    console.error("[Stats] Failed to update quick success rates:", e.message);
   }
 }
 
@@ -296,6 +358,11 @@ function startDashboard(stateManager) {
         if (!betLog.find(existing => existing.id === b.id)) betLog.push(b);
       }
       betLog.sort((a, b) => new Date(b.time) - new Date(a.time));
+      const lastSuccess = recentBets.find(b => b.outcome === "SUCCESS");
+      if (lastSuccess) {
+        lastSuccessBetTime = lastSuccess.time;
+        console.log(`[MongoDB] Initialized last success bet time: ${lastSuccessBetTime}`);
+      }
       console.log(`[MongoDB] Connected. Loaded ${recentBets.length} recent bets from PRETTYGAMING_BETS.`);
 
       const agg = await dbCollection.aggregate([
@@ -493,13 +560,25 @@ function startDashboard(stateManager) {
     return { ok: true, stats: result, dateInfo };
   }
 
-  function reportStatsToCentral() {
+  async function reportStatsToCentral() {
     if (!dbCollection) return;
+
+    try {
+      await updateSuccessRatesQuick();
+    } catch (err) {
+      console.error("[Telemetry] Failed to update success rates:", err.message);
+    }
+
     const ranges = ["today", "yesterday", "last_7_days", "all_time"];
     const reportData = {
       platform: "PG",
       label: "Pretty Gaming",
       timestamp: new Date().toISOString(),
+      lastSuccessBetTime: lastSuccessBetTime,
+      successRates: {
+        last100: cachedSuccessRates.last100,
+        last1000: cachedSuccessRates.last1000
+      },
       ranges: {}
     };
 
@@ -772,6 +851,7 @@ function startDashboard(stateManager) {
               bet.outcome = "WRONG_AMOUNT";
             } else {
               bet.outcome = "SUCCESS";
+              lastSuccessBetTime = bet.time;
             }
           } else {
             bet.outcome = "UNPLACED";
