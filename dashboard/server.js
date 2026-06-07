@@ -40,7 +40,7 @@ const ROOT = path.join(__dirname, "..");
 
 let _stateManager = null;
 let latestStateInMemory = null;
-let scraperSocket = null;
+const scraperSockets = new Set();
 const uiSockets = new Set();
 const betLog = [];
 const centralBetQueue = [];
@@ -532,7 +532,8 @@ function startDashboard(stateManager) {
     }
 
     const formatStats = (st) => {
-      const effRebate = st.effTurnover * 0.012;
+      const rebateRate = betConfig.rebateRate !== undefined ? parseFloat(betConfig.rebateRate) : 0.012;
+      const effRebate = st.effTurnover * rebateRate;
       const avgEv = st.effTurnover > 0 ? (st.expValue / st.effTurnover) : 0;
       return {
         pnl: st.pnl,
@@ -1055,13 +1056,18 @@ function startDashboard(stateManager) {
 
     if (req.method === "POST" && req.url === "/reset-all") {
       if (!_stateManager) {
-        if (!scraperSocket || scraperSocket.readyState !== ws.OPEN) {
+        const activeScraper = Array.from(scraperSockets).find(s => s.readyState === ws.OPEN);
+        if (!activeScraper) {
           res.writeHead(503, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ error: "Scraper client is offline or disconnected" }));
           return;
         }
         try {
-          scraperSocket.send(JSON.stringify({ type: "reset-all" }));
+          for (const s of scraperSockets) {
+            if (s.readyState === ws.OPEN) {
+              s.send(JSON.stringify({ type: "reset-all" }));
+            }
+          }
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ ok: true, message: "Reset command successfully sent to scraper" }));
         } catch (err) {
@@ -1093,13 +1099,18 @@ function startDashboard(stateManager) {
       }
 
       if (!_stateManager) {
-        if (!scraperSocket || scraperSocket.readyState !== ws.OPEN) {
+        const activeScraper = Array.from(scraperSockets).find(s => s.readyState === ws.OPEN);
+        if (!activeScraper) {
           res.writeHead(503, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ error: "Scraper client is offline or disconnected" }));
           return;
         }
         try {
-          scraperSocket.send(JSON.stringify({ type: "reset", table: tableName }));
+          for (const s of scraperSockets) {
+            if (s.readyState === ws.OPEN) {
+              s.send(JSON.stringify({ type: "reset", table: tableName }));
+            }
+          }
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ ok: true, table: tableName, message: `Reset command successfully sent to scraper` }));
         } catch (err) {
@@ -1179,7 +1190,7 @@ function startDashboard(stateManager) {
 
     if (clientType === "scraper") {
       console.log("[WS] Scraper client connected.");
-      scraperSocket = socket;
+      scraperSockets.add(socket);
 
       // Broadcast status update
       broadcastToUI({ type: "scraper_status", status: "online" });
@@ -1200,14 +1211,20 @@ function startDashboard(stateManager) {
 
       socket.on("close", () => {
         console.log("[WS] Scraper client disconnected.");
-        if (scraperSocket === socket) {
-          scraperSocket = null;
+        scraperSockets.delete(socket);
+
+        // Check if there are no active scrapers left
+        const hasActiveScrapers = Array.from(scraperSockets).some(s => s.readyState === ws.OPEN);
+        if (!hasActiveScrapers) {
+          broadcastToUI({ type: "scraper_status", status: "offline" });
+          sendWhatsAppNotification(`[CRITICAL] Pretty Gaming Scraper client disconnected from Dashboard (0 active scrapers remaining).`)
+            .catch(err => console.error("WhatsApp notification failed:", err.message));
         }
-        broadcastToUI({ type: "scraper_status", status: "offline" });
       });
 
       socket.on("error", (err) => {
         console.error("[WS] Scraper socket error:", err.message);
+        scraperSockets.delete(socket);
       });
 
       // Welcome scraper
@@ -1219,7 +1236,7 @@ function startDashboard(stateManager) {
       // Welcome UI with initial states
       socket.send(JSON.stringify({
         type: "init",
-        scraper_status: scraperSocket ? "online" : "offline",
+        scraper_status: Array.from(scraperSockets).some(s => s.readyState === ws.OPEN) ? "online" : "offline",
         state: latestStateInMemory
       }));
 
