@@ -253,3 +253,45 @@ Here is a modular template designed to intercept standard browser technologies (
 })();
 ```
 
+---
+
+## 🛡️ Reliability Watchdogs & Modular Page Checks
+
+To guarantee high availability and quick self-healing recovery, the scraper engine implements an automated page check framework defined in [pageCheck.js](file:///c:/Users/desmo/Desktop/v5-template/eyes/pageCheck.js) which exports two main configuration helpers:
+
+### 1. Readiness Watchdog (`setupReadinessCheck`)
+* **Trigger**: Starts a 15-second timer immediately after injecting event interceptors on the browser page.
+* **Condition**: Checks if a valid game state update is received via the bridge (`onTableStateUpdate`) or successfully primed from the interceptor cache on startup.
+* **Failure Action**: If no state is received within 15 seconds, it logs a critical error, sends a WhatsApp alert, sets `pageRef.current.closeReason = "Failed readiness check"`, and rejects/resolves the runner execution to let the supervisor relaunch the process.
+* **Success Action**: Once a state is successfully received, the watchdog clears and logs: `Readiness watchdog cleared — game state is flowing`.
+
+### 2. Liveness & URL Watchdog (`setupLivenessCheck`)
+* **Interval**: Runs periodically on a 5-second interval.
+* **Staleness Check**: Monitors the time gap since the last received game state. If no update is received for $\ge 15$ seconds, the connection is considered stale, sends a WhatsApp notification, sets `pageRef.current.closeReason = "Liveness check failed: stale connection"`, and exits to trigger supervisor restart.
+* **URL Domain Check**: Inspects `page.url()` every 5 seconds. If the page has navigated away from the target domain (`ct-999.com`), it triggers a WhatsApp notification, sets `pageRef.current.closeReason = "Liveness check failed: navigated away"`, and exits with a navigation loss error to force a restart.
+
+
+---
+
+## 📢 WebSocket Disconnection Alerts
+* **Client-Side**: If the WebSocket client loses connection to the central Dashboard server, it triggers an alert notification:
+  `[ALERT] Scraper "Label" lost connection to Dashboard WebSocket. Attempting reconnection...`
+* **Dashboard-Side**: If all active scrapers are disconnected, the dashboard triggers a WhatsApp alert:
+  `[CRITICAL] Pretty Gaming Scraper client disconnected from Dashboard (0 active scrapers remaining).`
+
+---
+
+## 👥 Running Multiple Scrapers (Backup Mode)
+
+You can launch multiple independent scraper instances to serve as redundant backups for the telemetry client.
+* **Index Configuration**: Customize the configuration of each backup scraper via the `eyes_accounts.json` array.
+* **Running Scrapers**: Start each instance by passing its array index (0-based) as an argument:
+  ```bash
+  # Launch the primary scraper (Index 0)
+  node eyes/launcher.js 0
+
+  # Launch the backup scraper (Index 1)
+  node eyes/launcher.js 1
+  ```
+* **Dashboard Support**: The central server maintains a `scraperSockets` Set. It aggregates state updates from all active instances and will keep the UI status `online` as long as at least one scraper socket is active.
+

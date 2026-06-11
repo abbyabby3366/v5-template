@@ -1,12 +1,14 @@
-multiple eyes (as backup)
 
 split bet amount to multiple accounts✅
-check if web socket disconnect, if yes, notify
-
 VPN as proxy✅
+check if got to bet live table mapping✅
 
-check if got to bet live table mapping
+bead road source and deduced✅
+multiple eyes (as backup)
+
+
+🚨Check launcher state:
 eyes stale state, 15 seconds restartr✅
-
-
-readiness and liveliness check
+Network watchdog
+- check if web socket disconnect, if yes, notify
+- readiness and liveliness check (check for tables, and every 15s)

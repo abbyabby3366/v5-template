@@ -255,3 +255,29 @@ To ensure zero-error execution, the AI implementing these functions must adhere 
    ```
 2. **Post-Bet Verification**: Never assume a bet is successful solely because the HTTP response code is `0`. Check and compare the balance before and after placement. If the balance remains unchanged after a successful API response, report a verification error.
 3. **Execution Locks**: Because multiple table updates happen concurrently, the `BetQueueProcessor` **must** lock the processing thread (`isBetInProgress = true`) until both the transaction and balance confirmations are fully complete.
+
+---
+
+## 🛡️ Reliability Watchdogs & Modular Page Checks
+
+To prevent stale or uninitialized browser sessions and guarantee continuous service, the bet module implements a dedicated page check framework defined in [pageCheck.js](file:///c:/Users/desmo/Desktop/v5-template/bet_module/src/pageCheck.js). This framework exports the following checks:
+
+### 1. Readiness Check (`runReadinessCheck`)
+* **Trigger**: Runs during the browser startup sequence in `BrowserController.launch()`.
+* **Condition**: Waits up to 15 seconds (using Puppeteer's `page.waitForFunction`) for the underlying Laya game engine to compile and register active `playerInfo` on the global `window` object.
+* **Success Action**: Defer setting `isBrowserReady = true` until `window.playerInfo` is successfully detected, ensuring the API routes are only accessible when the game engine is fully operational.
+* **Failure Action**: If the game engine fails to initialize within 15 seconds:
+  1. Raises a critical readiness check error.
+  2. Sends an immediate WhatsApp alert notification.
+  3. Closes the browser context to prevent memory/zombie tab leaks.
+  4. Rotates the configuration and starts a clean recovery session on the next account index.
+
+### 2. Liveness Check (`runLivenessCheck`)
+* **Trigger**: Executed inside `updateBalance()` every 5 seconds in `server.js`.
+* **Condition**: Monitors consecutive balance extraction failures from the active page using `fetchAccountBalance()`.
+* **Failure Action**: If balance retrieval fails 3 consecutive times ($\ge 15$ seconds of failure), it triggers a liveness failure alert:
+  1. Sends a critical WhatsApp notification to the operator.
+  2. Sets `page.closeReason = "Liveness check failed: consecutive balance failures"`.
+  3. Invokes the `onFail` callback which resets the failure count and calls `sessionManager.triggerRestart()` to cycle and rotate the account.
+* **Rotation Guard**: The failure counter automatically resets to 0 whenever a successful balance is retrieved or when a new active account configuration is loaded by the rotator.
+
