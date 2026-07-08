@@ -390,4 +390,4 @@ function sendStateOverWS(payload) {
 // Start WebSocket client immediately on module load
 connectToCentralWS();
 
-module.exports = { runEventBasedEyes, stateManager, sendStateOverWS };
+module.exports = { runEventBasedEyes, sendStateOverWS };

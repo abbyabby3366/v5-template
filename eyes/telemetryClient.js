@@ -169,9 +169,5 @@ function handleTelemetrySignals(events, stateManager) {
 }
 
 module.exports = {
-  sendShuffle,
-  sendTelemetry,
-  sendRoundOutcome,
-  sendBetSignal,
   handleTelemetrySignals
 };

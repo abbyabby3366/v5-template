@@ -138,6 +138,4 @@ function setupSessionRestart(browserContext, pageRef, acctConfig, onBeforeSwap) 
 module.exports = {
   setupSessionRestart,
   updateLoginTimestamp,
-  getLoginTimestamp,
-  loginToDemo,
 };

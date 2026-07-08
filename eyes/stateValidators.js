@@ -333,11 +333,7 @@ function checkSpecificCardDepletion(handHistory, playerCards, bankerCards) {
 
 module.exports = {
   checkEventValidations,
-  checkShoeResetNeeded,
   isResultState,
-  checkImpossibleCard,
-  checkGhostHands,
-  checkCardCount,
   checkBeadRoadMismatch,
   isInvalidStateReset,
   checkStaleRestoredState,
@@ -346,6 +342,5 @@ module.exports = {
   checkIsAlreadyFinalized,
   cardRankToIndex,
   processAndValidateCards,
-  normalizeCardName,
   checkSpecificCardDepletion,
 };

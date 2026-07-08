@@ -327,9 +327,6 @@ class TableStateManager {
     this.#resetShoe(ts, reason);
   }
 
-  resetShoe(ts, reason) {
-    this.#resetShoe(ts, reason);
-  }
 
   #resetShoe(ts, reason) {
     const roundInfo = (ts.round > 0 && !reason.includes("decreased from") && !reason.includes("reset from"))
@@ -441,6 +438,4 @@ class TableStateManager {
 module.exports = {
   TableStateManager,
   cardRankToIndex,
-  freshShoe,
-  deckRemaining
 };

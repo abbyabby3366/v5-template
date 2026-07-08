@@ -130,4 +130,4 @@ async function processEVForEvents(events, dynamicConfig = {}) {
   }
 }
 
-module.exports = { calculateEV, processEVForEvents };
+module.exports = { processEVForEvents };
