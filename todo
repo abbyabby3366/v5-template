@@ -4,7 +4,7 @@ VPN as proxy✅
 check if got to bet live table mapping✅
 
 bead road source and deduced✅
-multiple eyes (as backup)
+
 
 
 🚨Check launcher state:
@@ -12,3 +12,6 @@ eyes stale state, 15 seconds restartr✅
 Network watchdog
 - check if web socket disconnect, if yes, notify
 - readiness and liveliness check (check for tables, and every 15s)
+
+multiple eyes (as backup)
+add rollover

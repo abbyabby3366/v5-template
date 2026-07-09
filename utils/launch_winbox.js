@@ -230,6 +230,16 @@ async function evaluateState(browser, urls) {
       const url = p.url() || "";
       return !url.startsWith("chrome://") && !url.startsWith("chrome-extension://") && !url.includes("devtools://");
   });
+
+  // 1. Check if ANY page is inside Pretty Gaming lobby first
+  for (const p of validPages) {
+    try {
+      const url = p.url() || "";
+      if (urls.pgLobby.some(domain => url.includes(domain))) {
+        return { state: STATES.IN_GAME, page: p };
+      }
+    } catch (e) {}
+  }
   
   let bestState = STATES.UNINITIALIZED;
   let targetPage = validPages.length > 0 ? validPages[0] : null;
@@ -297,11 +307,6 @@ async function evaluateState(browser, urls) {
           await sleep(2000);
           continue; // Re-evaluate this page's state after reload
         }
-      }
-
-      // Check if we reached the pretty gaming lobby
-      if (urls.pgLobby.some(domain => url.includes(domain))) {
-        return { state: STATES.IN_GAME, page: p };
       }
 
       let isDashboard = false;

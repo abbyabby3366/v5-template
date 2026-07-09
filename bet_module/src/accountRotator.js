@@ -1,6 +1,26 @@
 const path = require("path");
 const fs = require("fs");
-const { buildAccountConfig } = require("../../utils/launch_winbox");
+
+function buildDynamicAccountConfig(accountIndex, accountsPath) {
+  let accounts = [];
+  try {
+    accounts = JSON.parse(fs.readFileSync(accountsPath, "utf-8"));
+  } catch (err) {}
+  const account = accounts[accountIndex] || {};
+  const platform = (account.platform || "winbox").toLowerCase();
+
+  let launcher;
+  if (platform === "winbox") {
+    launcher = require("../../utils/launch_winbox");
+  } else if (platform === "a9" || platform === "on") {
+    launcher = require("../../utils/launch_a9");
+  } else if (platform === "atas") {
+    launcher = require("../../utils/launch_atas");
+  } else {
+    launcher = require("../../utils/launch_any");
+  }
+  return launcher.buildAccountConfig(accountIndex, accountsPath);
+}
 
 function isSingleTimeRangeWithinBounds(range) {
   if (typeof range !== "string") return true;
@@ -52,7 +72,7 @@ class AccountRotator {
 
   getCurrentConfig() {
     this.ensureActiveTiming();
-    return buildAccountConfig(this.currentAccountIndex, this.accountsPath);
+    return buildDynamicAccountConfig(this.currentAccountIndex, this.accountsPath);
   }
 
   /**

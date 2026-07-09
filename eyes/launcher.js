@@ -10,7 +10,6 @@
 
 const fs = require("fs");
 const path = require("path");
-const { launchAccount } = require("../utils/launch_any");
 const { sendWhatsAppNotification } = require("../utils/whatsapp_notifier");
 const config = require("./config");
 const { runEventBasedEyes } = require("./runEyes");
@@ -26,11 +25,26 @@ async function launchBrowserSession(acctConfig) {
   console.log(`[Launcher] Launching account "${acctConfig.label}"...`);
   updateLoginTimestamp(acctConfig.label);
 
-  const { browser, page: initialPage } = await launchAccount(acctConfig);
+  const platform = (acctConfig.platform || "any").toLowerCase();
+  let launcher;
+  if (platform === "winbox") {
+    launcher = require("../utils/launch_winbox");
+  } else if (platform === "a9" || platform === "on") {
+    launcher = require("../utils/launch_a9");
+  } else if (platform === "atas") {
+    launcher = require("../utils/launch_atas");
+  } else {
+    launcher = require("../utils/launch_any");
+  }
+
+  const { browser, page: initialPage } = await launcher.launchAccount(acctConfig);
   
-  // Navigate to lobby page via loginToDemo
-  const { loginToDemo } = require("./demoLogin");
-  const page = await loginToDemo(browser, acctConfig.proxy, initialPage);
+  let page = initialPage;
+  if (platform === "any" || platform === "hippo") {
+    // Navigate to lobby page via loginToDemo
+    const { loginToDemo } = require("./demoLogin");
+    page = await loginToDemo(browser, acctConfig.proxy, initialPage);
+  }
 
   // Wire up the active network watchdog on initial boot
   startNetworkWatchdog(page, console);
@@ -82,7 +96,7 @@ async function start() {
       await new Promise(r => setTimeout(r, 15000));
 
     } catch (err) {
-      console.error("\x1b[31m[Supervisor] Recovery trigger:\x1b[0m", err.message);
+      console.error("\x1b[31m[Supervisor] Recovery trigger:\x1b[0m", err.stack || err.message);
       if (restartTimer) clearInterval(restartTimer);
 
       const label = acctConfig?.label || "PG Eyes";

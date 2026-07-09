@@ -1,6 +1,5 @@
 const path = require("path");
 const fs = require("fs");
-const { launchAccount } = require("../../utils/launch_winbox");
 
 class BrowserController {
   constructor() {
@@ -78,7 +77,20 @@ class BrowserController {
       console.error("[Browser] Stale Chrome cleanup warning:", err.message);
     }
 
-    console.log(`\n[Browser] Starting winbox browser sequence for ${acctConfig.label}...`);
+    const platform = (acctConfig.platform || "winbox").toLowerCase();
+    console.log(`\n[Browser] Starting ${platform} browser sequence for ${acctConfig.label}...`);
+    
+    let launcher;
+    if (platform === "winbox") {
+      launcher = require("../../utils/launch_winbox");
+    } else if (platform === "a9" || platform === "on") {
+      launcher = require("../../utils/launch_a9");
+    } else if (platform === "atas") {
+      launcher = require("../../utils/launch_atas");
+    } else {
+      launcher = require("../../utils/launch_any");
+    }
+    const { launchAccount } = launcher;
     const { browser, page, ip } = await launchAccount(acctConfig);
 
     this.browserInstance = browser;
