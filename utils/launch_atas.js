@@ -240,6 +240,64 @@ const STATES = {
   UNINITIALIZED: "UNINITIALIZED",
 };
 
+/**
+ * Recursively gets all frames in the page/frame, including content frames of <iframe> elements.
+ * 
+ * @param {import('puppeteer').Page | import('puppeteer').Frame} pageOrFrame
+ * @param {Set<import('puppeteer').Frame>} visited
+ * @returns {Promise<import('puppeteer').Frame[]>}
+ */
+async function getAllFrames(pageOrFrame, visited = new Set()) {
+  const frames = [];
+  
+  let childFrames = [];
+  try {
+    if (typeof pageOrFrame.frames === 'function') {
+      childFrames = pageOrFrame.frames();
+    } else if (typeof pageOrFrame.childFrames === 'function') {
+      childFrames = pageOrFrame.childFrames();
+    }
+  } catch (e) {}
+
+  for (const f of childFrames) {
+    if (!visited.has(f)) {
+      visited.add(f);
+      frames.push(f);
+      const nested = await getAllFrames(f, visited);
+      frames.push(...nested);
+    }
+  }
+
+  try {
+    const iframeElements = await pageOrFrame.$$('iframe').catch(() => []);
+    for (const iframeEl of iframeElements) {
+      const contentFrame = await iframeEl.contentFrame().catch(() => null);
+      if (contentFrame && !visited.has(contentFrame)) {
+        visited.add(contentFrame);
+        frames.push(contentFrame);
+        const nested = await getAllFrames(contentFrame, visited);
+        frames.push(...nested);
+      }
+    }
+  } catch (e) {}
+
+  return frames;
+}
+
+/**
+ * Gets all frames in the page, starting from the main frame.
+ * 
+ * @param {import('puppeteer').Page} page
+ * @returns {Promise<import('puppeteer').Frame[]>}
+ */
+async function getAllFramesOfPage(page) {
+  const visited = new Set();
+  const mainFrame = page.mainFrame();
+  visited.add(mainFrame);
+  const childFrames = await getAllFrames(mainFrame, visited);
+  return [mainFrame, ...childFrames];
+}
+
 async function evaluateState(browser, urls, selectors) {
   const pages = await browser.pages();
   const validPages = pages.filter(p => {
@@ -263,6 +321,7 @@ async function evaluateState(browser, urls, selectors) {
   for (const p of validPages) {
     try {
       const url = p.url() || "";
+      const allFrames = await getAllFramesOfPage(p);
 
       // Check all frames
       let hasUid = false;
@@ -270,7 +329,7 @@ async function evaluateState(browser, urls, selectors) {
       let hasDashboardIndicator = false;
       let hasDialog = false;
 
-      for (const frame of p.frames()) {
+      for (const frame of allFrames) {
         try {
           if (await frame.$(selectors.uid).catch(() => null)) hasUid = true;
           if (await frame.$('.Login-btn').catch(() => null)) hasLandingBtn = true;
@@ -489,9 +548,10 @@ async function launchAccount(acctConfig) {
         } else if (currentState === STATES.ATAS_LOGIN) {
           logger.log("Handling ATAS_LOGIN...");
           
+          const allFrames = await getAllFramesOfPage(page);
           let loginFrame = page;
           let uidInput = null;
-          for (const frame of page.frames()) {
+          for (const frame of allFrames) {
             uidInput = await frame.$(selectors.uid).catch(() => null);
             if (uidInput) {
               loginFrame = frame;
@@ -502,7 +562,7 @@ async function launchAccount(acctConfig) {
           if (!uidInput) {
             logger.log("UID input not visible immediately. Checking for click-to-login landing buttons...");
             let clicked = false;
-            for (const frame of page.frames()) {
+            for (const frame of allFrames) {
               const elements = await frame.$$('span, div, button, a').catch(() => []);
               for (const el of elements) {
                 try {
@@ -526,7 +586,7 @@ async function launchAccount(acctConfig) {
             }
             
             // Re-check for uid input after clicking
-            for (const frame of page.frames()) {
+            for (const frame of allFrames) {
               uidInput = await frame.$(selectors.uid).catch(() => null);
               if (uidInput) {
                 loginFrame = frame;
@@ -567,9 +627,10 @@ async function launchAccount(acctConfig) {
         } else if (currentState === STATES.ATAS_DASHBOARD) {
           logger.log("Handling ATAS_DASHBOARD...");
           
+          const allFrames = await getAllFramesOfPage(page);
           // Dismiss guide overlays if visible
           let dismissedGuide = false;
-          for (const frame of page.frames()) {
+          for (const frame of allFrames) {
             try {
               const guideOverlay = await frame.$('.guide-tip__overlay, .guide-tip').catch(() => null);
               if (guideOverlay) {
@@ -585,7 +646,7 @@ async function launchAccount(acctConfig) {
 
           // Dismiss popup ads if any
           let dismissedPopup = false;
-          for (const frame of page.frames()) {
+          for (const frame of allFrames) {
             try {
               const closeBtn = await frame.$(selectors.dashboardPopupCloseButton).catch(() => null);
               if (closeBtn) {
@@ -610,7 +671,7 @@ async function launchAccount(acctConfig) {
           let hotroadItem = null;
           let hotroadItemFrame = page;
           let hotroadImg = null;
-          for (const frame of page.frames()) {
+          for (const frame of allFrames) {
             const items = await frame.$$('.gameItem').catch(() => []);
             for (const item of items) {
               const img = await item.$('img[src*="ROAD"]').catch(() => null);
@@ -628,7 +689,7 @@ async function launchAccount(acctConfig) {
             // Find and click the Live Casino tab (text content matches "Live")
             let liveTab = null;
             let liveTabFrame = page;
-            for (const frame of page.frames()) {
+            for (const frame of allFrames) {
               const items = await frame.$$('.item').catch(() => []);
               for (const item of items) {
                 const txt = await frame.evaluate(el => el.textContent.trim(), item);
@@ -657,8 +718,9 @@ async function launchAccount(acctConfig) {
         } else if (currentState === STATES.ATAS_DIALOG) {
           logger.log("Handling ATAS_DIALOG (game pop-up)...");
           
+          const allFrames = await getAllFramesOfPage(page);
           // Switch to Wallet tab to make sure Start Game is enabled
-          for (const frame of page.frames()) {
+          for (const frame of allFrames) {
             try {
               const dialogs = await frame.$$('.game-pop__dialog').catch(() => []);
               for (const dialog of dialogs) {
@@ -686,7 +748,10 @@ async function launchAccount(acctConfig) {
           // Now find the Start Game button in the visible dialog
           let startBtn = null;
           let startBtnFrame = page;
-          for (const frame of page.frames()) {
+          let quitBtn = null;
+          let quitBtnFrame = page;
+
+          for (const frame of allFrames) {
             try {
               const dialogs = await frame.$$('.game-pop__dialog').catch(() => []);
               for (const dialog of dialogs) {
@@ -702,14 +767,16 @@ async function launchAccount(acctConfig) {
                     if (txt.includes('Start Game')) {
                       startBtn = btn;
                       startBtnFrame = frame;
-                      break;
+                    } else if (txt.includes('Quit Game')) {
+                      quitBtn = btn;
+                      quitBtnFrame = frame;
                     }
                   }
                 }
-                if (startBtn) break;
+                if (startBtn || quitBtn) break;
               }
             } catch(e) {}
-            if (startBtn) break;
+            if (startBtn || quitBtn) break;
           }
 
           if (startBtn) {
@@ -724,8 +791,12 @@ async function launchAccount(acctConfig) {
               page = await newTarget.page();
               await sleep(4000);
             }
+          } else if (quitBtn) {
+            logger.log("Found 'Quit Game' button. Clicking to exit previous session...");
+            await quitBtnFrame.evaluate(el => el.click(), quitBtn).catch(() => {});
+            await sleep(4000);
           } else {
-            logger.warn("Could not find 'Start Game' button in pop-up dialog.");
+            logger.warn("Could not find 'Start Game' or 'Quit Game' button in pop-up dialog.");
             await sleep(3000);
           }
         }
