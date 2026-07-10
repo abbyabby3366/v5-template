@@ -59,6 +59,60 @@ function getBaccaratValue(cards) {
   return sum % 10;
 }
 
+function verifyCardsMatchOutcome(playerCards, bankerCards, expectedCode) {
+  if (!expectedCode || !playerCards || !bankerCards) return false;
+  if (playerCards.length < 2 || playerCards.length > 3 || bankerCards.length < 2 || bankerCards.length > 3) return false;
+  
+  const code = expectedCode.toLowerCase();
+  
+  // 1. Calculate Baccarat Scores
+  const getBaccaratScore = (cards) => {
+    let score = 0;
+    for (const card of cards) {
+      const rank = card.slice(0, -1).toUpperCase();
+      let val = 0;
+      if (rank === "A") val = 1;
+      else if (["T", "J", "Q", "K", "10"].includes(rank)) val = 0;
+      else {
+        val = parseInt(rank, 10);
+        if (isNaN(val)) val = 0;
+      }
+      score += val;
+    }
+    return score % 10;
+  };
+  
+  const pScore = getBaccaratScore(playerCards);
+  const bScore = getBaccaratScore(bankerCards);
+  
+  // 2. Determine Winner
+  let determinedWinner = "";
+  if (pScore > bScore) determinedWinner = "P";
+  else if (pScore < bScore) determinedWinner = "B";
+  else determinedWinner = "T";
+  
+  let expectedWinner = "";
+  if (code.startsWith('p')) expectedWinner = "P";
+  else if (code.startsWith('b')) expectedWinner = "B";
+  else if (code.startsWith('t')) expectedWinner = "T";
+  
+  if (determinedWinner !== expectedWinner) return false;
+  
+  // 3. Determine Pairs
+  const hasPlayerPair = playerCards.length >= 2 && playerCards[0].slice(0, -1) === playerCards[1].slice(0, -1);
+  const hasBankerPair = bankerCards.length >= 2 && bankerCards[0].slice(0, -1) === bankerCards[1].slice(0, -1);
+  
+  // After the first character (winner), 'p' in suffix = player pair, 'b' in suffix = banker pair
+  // e.g., 'ppb' -> suffix 'pb' -> player pair + banker pair; 'tpb' -> suffix 'pb' -> both pairs
+  const pairSuffix = code.slice(1);
+  const expectsPlayerPair = pairSuffix.includes('p');
+  const expectsBankerPair = pairSuffix.includes('b');
+  
+  if (hasPlayerPair !== expectsPlayerPair) return false;
+  if (hasBankerPair !== expectsBankerPair) return false;
+  
+  return true;
+}
 
 class TableState {
   constructor(tableName, tableId = null) {
@@ -91,6 +145,73 @@ class TableState {
   get lastHand() {
     if (this.handHistory.length === 0) return null;
     return this.handHistory[this.handHistory.length - 1];
+  }
+
+  reconcileRound(round, playerCards, bankerCards, expectedCode) {
+    if (!verifyCardsMatchOutcome(playerCards, bankerCards, expectedCode)) {
+      console.log(`\x1b[31m[RECONCILE] ${this.tableName} Verification failed for R${round}: cards [P:${playerCards.join(",")}, B:${bankerCards.join(",")}] do not match code "${expectedCode}"\x1b[0m`);
+      return false;
+    }
+    
+    let winner = "T";
+    if (expectedCode.toLowerCase().startsWith('p')) winner = "P";
+    else if (expectedCode.toLowerCase().startsWith('b')) winner = "B";
+    
+    const existingIndex = this.handHistory.findIndex(item => item && item.round === round);
+    
+    if (existingIndex >= 0) {
+      const oldItem = this.handHistory[existingIndex];
+      const cardsIdentical = (arr1, arr2) => {
+        if (arr1.length !== arr2.length) return false;
+        return arr1.every((val, index) => val === arr2[index]);
+      };
+      
+      if (oldItem.winner === winner && cardsIdentical(oldItem.playerCards || [], playerCards) && cardsIdentical(oldItem.bankerCards || [], bankerCards)) {
+        return true; 
+      }
+      
+      const msg = `[RECONCILE] ${this.tableName} R${round} discrepancy corrected successfully! Replaced [P:${oldItem.playerCards || []}, B:${oldItem.bankerCards || []}] with verified [P:${playerCards.join(",")}, B:${bankerCards.join(",")}]`;
+      console.log(`\x1b[33m${msg}\x1b[0m`);
+      
+      const allOldCards = [...(oldItem.playerCards || []), ...(oldItem.bankerCards || [])];
+      for (const card of allOldCards) {
+        const idx = cardRankToIndex(card);
+        if (idx >= 0 && this.deckComposition[idx] < 32) {
+          this.deckComposition[idx]++;
+        }
+      }
+      
+      oldItem.playerCards = playerCards;
+      oldItem.bankerCards = bankerCards;
+      oldItem.winner = winner;
+      oldItem.isReconciled = true;
+    } else {
+      const msg = `[RECONCILE] ${this.tableName} R${round} gap recovered successfully! Cards: [P:${playerCards.join(",")}, B:${bankerCards.join(",")}]`;
+      console.log(`\x1b[36m${msg}\x1b[0m`);
+      
+      this.handHistory.push({
+        round: round,
+        winner: winner,
+        playerCards: playerCards,
+        bankerCards: bankerCards,
+        isReconciled: true
+      });
+      this.handHistory.sort((a, b) => a.round - b.round);
+    }
+    
+    const allNewCards = [...playerCards, ...bankerCards];
+    for (const card of allNewCards) {
+      const idx = cardRankToIndex(card);
+      if (idx >= 0 && this.deckComposition[idx] > 0) {
+        this.deckComposition[idx]--;
+      }
+    }
+    
+    if (round > this.lastFinalizedRound) {
+      this.lastFinalizedRound = round;
+    }
+    
+    return true;
   }
 }
 

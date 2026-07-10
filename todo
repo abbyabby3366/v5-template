@@ -14,4 +14,4 @@ Network watchdog
 - readiness and liveliness check (check for tables, and every 15s)
 
 multiple eyes (as backup)
-add rollover
+add failover

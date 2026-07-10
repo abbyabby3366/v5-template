@@ -102,6 +102,127 @@ async function syncActualDeckComposition(page, table) {
   }
 }
 
+// Negative cache: tracks rounds where peer lookup failed, to avoid re-querying.
+// Value is { expiry: timestamp } — skip if Date.now() < expiry.
+const reconcileNegativeCache = new Map();
+const NEGATIVE_CACHE_NOT_FOUND_MS = 5 * 60 * 1000; // 5 minutes for confirmed "not found"
+const NEGATIVE_CACHE_ERROR_MS = 60 * 1000;          // 60 seconds for timeout/connection errors
+let reconcileRunning = false;
+
+function mapServerCodeToWinner(code) {
+  if (!code) return null;
+  if (code.startsWith('p')) return 'P';
+  if (code.startsWith('b')) return 'B';
+  if (code.startsWith('t')) return 'T';
+  return null;
+}
+
+async function checkAndReconcileTables(filteredTables, dynamicConfig) {
+  if (reconcileRunning) return;
+  reconcileRunning = true;
+  try {
+    for (const table of filteredTables) {
+      const ts = stateManager.getTable(table.tableName);
+      if (!ts) continue;
+
+      // Skip reconciliation if table is currently shuffling
+      const isShuffling = table.state && table.state.toLowerCase().includes("shuff");
+      if (isShuffling) continue;
+
+      // Skip reconciliation if statistics are from a previous shoe (out of sync)
+      if (table.round && table.statistics && table.statistics.length > table.round) continue;
+
+      const stats = table.statistics || [];
+
+      for (let r = 1; r <= stats.length; r++) {
+        const serverCode = stats[r - 1];
+        const expectedWinner = mapServerCodeToWinner(serverCode);
+        if (!expectedWinner) continue;
+
+        // Only reconcile past rounds to let the local scraper process the current round naturally.
+        const isPastRound = (table.round && r < table.round) || r < stats.length;
+        if (!isPastRound) continue;
+
+        const deducedItem = ts.handHistory.find(item => item && item.round === r);
+        let needsReconciliation = false;
+
+        if (!deducedItem) {
+          needsReconciliation = true;
+        } else if (deducedItem.winner !== expectedWinner) {
+          needsReconciliation = true;
+        }
+
+        if (!needsReconciliation) continue;
+
+        const key = `${table.tableName}:${r}`;
+
+        // Check negative cache — skip if we recently failed for this round
+        const cached = reconcileNegativeCache.get(key);
+        if (cached && Date.now() < cached.expiry) {
+          continue;
+        }
+
+        try {
+          const res = await fetch(`http://localhost:3456/api/reconcile-round?table=${encodeURIComponent(table.tableName)}&round=${r}`);
+          const data = await res.json();
+
+          if (data.ok && data.cards) {
+            const currentTs = stateManager.getTable(table.tableName);
+            if (!currentTs) continue;
+
+            const success = currentTs.reconcileRound(r, data.cards.playerCards, data.cards.bankerCards, serverCode);
+            if (success) {
+              // Recalculate EV since composition has changed
+              const { calculateEV } = require("./evCalculator");
+              const evResult = await calculateEV(currentTs.deckComposition, dynamicConfig);
+              if (evResult) {
+                currentTs.lastEvResult = evResult;
+              }
+              saveState(stateManager, eventLog);
+
+              const fs = require("fs");
+              const path = require("path");
+              let ignoredTables = [];
+              try {
+                const cfgPath = path.join(__dirname, "..", "dashboard", "config.json");
+                if (fs.existsSync(cfgPath)) {
+                  const cfg = JSON.parse(fs.readFileSync(cfgPath, "utf-8"));
+                  ignoredTables = cfg.ignoredTables || [];
+                }
+              } catch(e){}
+
+              const timestamp = new Date().toISOString().replace(/:/g, "-").split(".")[0];
+              const allScrapedTables = filteredTables.map(t => t.tableName);
+              await writeDashboardJson(filteredTables, stateManager, timestamp, [], allScrapedTables, ignoredTables, dynamicConfig, eventLog);
+            } else {
+              // Verification failed — peer likely returned cards from a different shoe.
+              // Cache to avoid retrying every tick.
+              reconcileNegativeCache.set(key, { expiry: Date.now() + NEGATIVE_CACHE_NOT_FOUND_MS });
+            }
+          } else {
+            // Not found or error — add to negative cache
+            const ttl = (data.reason === "peer_error") ? NEGATIVE_CACHE_ERROR_MS : NEGATIVE_CACHE_NOT_FOUND_MS;
+            reconcileNegativeCache.set(key, { expiry: Date.now() + ttl });
+          }
+        } catch (err) {
+          // Network error reaching local Central — cache briefly
+          reconcileNegativeCache.set(key, { expiry: Date.now() + NEGATIVE_CACHE_ERROR_MS });
+        }
+      }
+    }
+
+    // Housekeep: prune expired entries from negative cache periodically
+    if (reconcileNegativeCache.size > 200) {
+      const now = Date.now();
+      for (const [k, v] of reconcileNegativeCache) {
+        if (now >= v.expiry) reconcileNegativeCache.delete(k);
+      }
+    }
+  } finally {
+    reconcileRunning = false;
+  }
+}
+
 async function runEventBasedEyes(pageRef, extractorCode, acctConfig) {
   let processing = false;
   let runAgain = false;
@@ -131,6 +252,14 @@ async function runEventBasedEyes(pageRef, extractorCode, acctConfig) {
           await syncActualDeckComposition(activePage, table);
 
           const events = stateManager.update([table]);
+          for (const e of events) {
+            if (e.type === "SHOE_RESET" && e.tableName) {
+              const prefix = `${e.tableName}:`;
+              for (const key of reconcileNegativeCache.keys()) {
+                if (key.startsWith(prefix)) reconcileNegativeCache.delete(key);
+              }
+            }
+          }
           if (events.length === 0) continue;
 
           await processEVForEvents(events, dynamicConfig);
@@ -158,6 +287,7 @@ async function runEventBasedEyes(pageRef, extractorCode, acctConfig) {
 
         // Dashboard snapshot
         const allTables = Array.from(latestScrapedTables.values());
+        await checkAndReconcileTables(allTables, dynamicConfig);
         await writeDashboardJson(allTables, stateManager, timestamp, [], Array.from(latestScrapedTables.keys()), ignoredTables, dynamicConfig, eventLog);
 
       } while (runAgain);
