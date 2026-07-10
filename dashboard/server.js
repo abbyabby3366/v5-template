@@ -562,6 +562,7 @@ function startDashboard(stateManager) {
   }
 
   async function reportStatsToCentral() {
+    if (process.env.DISABLE_TELEMETRY === "TRUE" || process.env.DISABLE_TELEMETRY === "true") return;
     if (!dbCollection) return;
 
     try {
@@ -572,8 +573,8 @@ function startDashboard(stateManager) {
 
     const ranges = ["today", "yesterday", "last_7_days", "all_time"];
     const reportData = {
-      platform: "PG",
-      label: "Pretty Gaming",
+      platform: process.env.TELEMETRY_PLATFORM || "PG",
+      label: process.env.TELEMETRY_LABEL || "Pretty Gaming",
       timestamp: new Date().toISOString(),
       lastSuccessBetTime: lastSuccessBetTime,
       successRates: {
@@ -1217,7 +1218,7 @@ function startDashboard(stateManager) {
         const hasActiveScrapers = Array.from(scraperSockets).some(s => s.readyState === ws.OPEN);
         if (!hasActiveScrapers) {
           broadcastToUI({ type: "scraper_status", status: "offline" });
-          sendWhatsAppNotification(`[CRITICAL] Pretty Gaming Scraper client disconnected from Dashboard (0 active scrapers remaining).`)
+          sendWhatsAppNotification(`[CRITICAL] ${process.env.TELEMETRY_LABEL || "Pretty Gaming"} Scraper client disconnected from Dashboard (0 active scrapers remaining).`)
             .catch(err => console.error("WhatsApp notification failed:", err.message));
         }
       });
