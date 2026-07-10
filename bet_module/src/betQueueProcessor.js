@@ -61,6 +61,8 @@ class BetQueueProcessor {
             betPlacementDelayMs: parseInt(process.env.BET_PLACEMENT_DELAY_MS || "150", 10),
             chipSettleDelayMs: parseInt(process.env.CHIP_SETTLE_DELAY_MS || "500", 10),
             chipSelector: ".chip",
+            betConfirmTimeoutMs: parseInt(process.env.BET_CONFIRM_TIMEOUT_MS || "2000", 10),
+            maxAttempts: parseInt(process.env.BET_MAX_ATTEMPTS || "1", 10)
           };
 
           try {
@@ -75,6 +77,9 @@ class BetQueueProcessor {
               context.onBalanceUpdatedFn(result.balance);
             }
             bet.timer = result.timer != null ? result.timer : null;
+            bet.attempts = result.attempts || 1;
+            bet.enterAttempts = result.enterAttempts || 1;
+            bet.attemptOutcomes = result.attemptOutcomes || [];
           } catch (err) {
             reason = `Execution error: ${err.message}`;
           }
@@ -113,7 +118,10 @@ class BetQueueProcessor {
           bet.actualBetAmount,
           bet.tableName,
           bet.target || bet.betType,
-          bet.timer
+          bet.timer,
+          bet.attempts,
+          bet.enterAttempts,
+          bet.attemptOutcomes
         ).catch(() => {});
         
       } else {

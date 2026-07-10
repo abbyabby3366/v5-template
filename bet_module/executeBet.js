@@ -326,15 +326,62 @@ async function executeBet(page, betConfig) {
       return { success: false, reason: "Game ID not resolved", timer: timeLeft };
     }
 
-    // 3. Place the bet transaction
-    const betResult = await submitBetAndConfirm(page, betConfig, gameId, limitId || 3016, balanceBefore);
+    // 3. Place the bet transaction with local retry attempts
+    let success = false;
+    let reason = "Unknown error";
+    let attempt = 1;
+    const maxAttempts = betConfig.maxAttempts !== undefined ? betConfig.maxAttempts : 1;
+    const attemptOutcomes = [];
+    let finalBetResult = null;
+
+    while (attempt <= maxAttempts) {
+      const betResult = await submitBetAndConfirm(page, betConfig, gameId, limitId || 3016, balanceBefore);
+      finalBetResult = betResult;
+      success = betResult.success;
+      reason = success ? "" : (betResult.reason || "Unknown error");
+      const outcomeMsg = success ? "SUCCESS" : `FAILED (Reason: ${reason})`;
+      attemptOutcomes.push({ attempt, outcomeMsg });
+      console.log(`[executeBet] Bet attempt ${attempt}: ${outcomeMsg}`);
+
+      if (success) {
+        break;
+      }
+
+      // Retry if it's a timeout or network/socket connection issue
+      const isTimeout = reason.toLowerCase().includes("timeout");
+      const isSocketError = reason.toLowerCase().includes("disconnect") || reason.toLowerCase().includes("network") || reason.toLowerCase().includes("fetch");
+      const isSystemError = isTimeout || isSocketError;
+
+      if (attempt < maxAttempts && isSystemError) {
+        attempt++;
+        await new Promise(r => setTimeout(r, 100));
+      } else {
+        break;
+      }
+    }
+
+    if (success && attempt > 1) {
+      try {
+        const { sendWhatsAppNotification } = require("../utils/whatsapp_notifier");
+        const msg = `[ALERT] Bet on table ${betConfig.tableName} (${betConfig.betType}) succeeded on RETRY (Attempt ${attempt}). Amount: ${finalBetResult.betAmount}.`;
+        console.log(`[Bet Module] Succeeded on retry. Sending WhatsApp notification: "${msg}"`);
+        sendWhatsAppNotification(msg).catch(err => {
+          console.error(`[Bet Module] WhatsApp notifier catch:`, err.message);
+        });
+      } catch (err) {
+        console.error(`[Bet Module] Failed to load/send WhatsApp notification:`, err.message);
+      }
+    }
 
     return {
-      success: betResult.success,
-      reason: betResult.reason,
-      betAmount: betResult.betAmount,
-      balance: betResult.balance,
-      timer: timeLeft
+      success: success,
+      reason: success ? undefined : reason,
+      betAmount: success ? finalBetResult.betAmount : undefined,
+      balance: finalBetResult ? finalBetResult.balance : String(balanceBefore || ""),
+      timer: timeLeft,
+      retried: success && (attempt > 1),
+      attempts: attempt,
+      attemptOutcomes: attemptOutcomes
     };
   } catch (err) {
     console.error(`[Bet Module] Puppeteer evaluate error:`, err.message);

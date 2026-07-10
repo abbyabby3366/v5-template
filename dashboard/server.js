@@ -5,7 +5,7 @@ const path = require("path");
 require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
 const { MongoClient } = require("mongodb");
 const { sendWhatsAppNotification } = require("../utils/whatsapp_notifier");
-const { resolveSplitBetTargets, dispatchBet } = require("./splitBet");
+const { resolveSplitBetTargets, dispatchBet, triggerBetFailover } = require("./splitBet");
 
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017";
 const MONGODB_NAME = process.env.MONGODB_NAME || "neuron_baccarat";
@@ -41,6 +41,38 @@ const ROOT = path.join(__dirname, "..");
 let _stateManager = null;
 let latestStateInMemory = null;
 
+function getTableRemainingTimer(tableName) {
+  if (!tableName) return 0;
+  const cleanTarget = tableName.trim().toUpperCase();
+  
+  const matchTable = (t) => {
+    if (!t || !t.tableName) return false;
+    const cleanSource = t.tableName.trim().toUpperCase();
+    return cleanSource === cleanTarget || cleanSource.includes(cleanTarget) || cleanTarget.includes(cleanSource);
+  };
+
+  if (latestStateInMemory && Array.isArray(latestStateInMemory.tables)) {
+    const tbl = latestStateInMemory.tables.find(matchTable);
+    if (tbl && typeof tbl.timer === 'number') {
+      return tbl.timer;
+    }
+  }
+  // Fallback: try to read from the JSON file
+  try {
+    const filePath = path.join(ROOT, "eyes", "json", "tables_state.json");
+    if (fs.existsSync(filePath)) {
+      const data = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+      if (data && Array.isArray(data.tables)) {
+        const tbl = data.tables.find(matchTable);
+        if (tbl && typeof tbl.timer === 'number') {
+          return tbl.timer;
+        }
+      }
+    }
+  } catch (e) { }
+  return 0;
+}
+
 try {
   const initPath = path.join(ROOT, "eyes", "json", "tables_state.json");
   if (fs.existsSync(initPath)) {
@@ -57,8 +89,8 @@ try {
 function getRoundCardsFromStateJson(tableName, round) {
   if (latestStateInMemory && Array.isArray(latestStateInMemory.tables)) {
     const table = latestStateInMemory.tables.find(t => t.tableName === tableName);
-    if (table && Array.isArray(table.deducedBeadRoad)) {
-      const match = table.deducedBeadRoad.find(r => r && r.round === round);
+    if (table && Array.isArray(table.handHistory)) {
+      const match = table.handHistory.find(r => r && r.round === round);
       if (match) {
         return match;
       }
@@ -960,6 +992,9 @@ function startDashboard(stateManager) {
           let placedAmt = parseFloat(placedAmtStr);
           let targetAmt = parseFloat(bet.recommendedBetAmount);
 
+          const failedModuleId = bet.targetModuleId;
+          let isFailoverTriggered = false;
+
           if (body.status === "SUCCESS") {
             if (isNaN(placedAmt) || placedAmt <= 0) {
               bet.outcome = "UNPLACED";
@@ -969,22 +1004,56 @@ function startDashboard(stateManager) {
               bet.outcome = "SUCCESS";
               lastSuccessBetTime = bet.time;
             }
+
+            if (bet.failoverCount > 0) {
+              const successMsg = `[FAILOVER SUCCESS] 🎉\nBet ID: ${bet.id}\nTable: ${bet.tableName}\nBackup Module: ${bet.targetModule}\nPlaced Amount: ${placedAmt}\nRemaining Timer: ${body.timer != null ? body.timer : 'N/A'}s`;
+              console.log(`\x1b[32m[Central] ${successMsg}\x1b[0m`);
+              sendWhatsAppNotification(successMsg).catch(e => console.error("WhatsApp error:", e.message));
+            }
           } else {
-            bet.outcome = "UNPLACED";
+            // Check for failover!
+            const remainingTimer = getTableRemainingTimer(bet.tableName);
+            const canFailover = (!bet.failoverCount || bet.failoverCount < 1) && remainingTimer >= 2;
+
+            if (canFailover) {
+              const failoverReason = body.reason || body.status;
+              const result = triggerBetFailover(bet, failedModuleId, activeModules, dbCollection, { reason: failoverReason, remainingTimer });
+              if (result.success) {
+                isFailoverTriggered = true;
+                console.log(`[Central] Failover triggered successfully for bet ${bet.id}: ${failedModuleId} -> ${result.newModuleId}`);
+              } else {
+                console.log(`[Central] Failover not possible for bet ${bet.id}: ${result.reason}`);
+                bet.outcome = "UNPLACED";
+
+                const failReasonMsg = `[FAILOVER CANCELLED] ❌\nBet ID: ${bet.id}\nTable: ${bet.tableName}\nReason: ${result.reason}`;
+                console.log(`\x1b[31m[Central] ${failReasonMsg}\x1b[0m`);
+                sendWhatsAppNotification(failReasonMsg).catch(e => console.error("WhatsApp error:", e.message));
+              }
+            } else {
+              bet.outcome = "UNPLACED";
+
+              if (bet.failoverCount > 0) {
+                const failMsg = `[FAILOVER FINAL FAILURE] ❌\nBet ID: ${bet.id}\nTable: ${bet.tableName}\nBackup Module: ${bet.targetModule}\nStatus: ${body.status}\nReason: ${body.reason || 'Unknown'}\nRemaining Timer: ${body.timer != null ? body.timer : 'N/A'}s`;
+                console.log(`\x1b[31m[Central] ${failMsg}\x1b[0m`);
+                sendWhatsAppNotification(failMsg).catch(e => console.error("WhatsApp error:", e.message));
+              }
+            }
           }
 
-          bet.actualBetAmount = body.betAmount || "-";
-          bet.timer = body.timer != null ? body.timer : null;
+          if (!isFailoverTriggered) {
+            bet.actualBetAmount = body.betAmount || "-";
+            bet.timer = body.timer != null ? body.timer : null;
 
-          if (dbCollection) {
-            dbCollection.updateOne(
-              { id: bet.id },
-              { $set: { outcome: bet.outcome, actualBetAmount: bet.actualBetAmount, executionState: bet.executionState, timer: bet.timer } }
-            ).catch(() => { });
+            if (dbCollection) {
+              dbCollection.updateOne(
+                { id: bet.id },
+                { $set: { outcome: bet.outcome, actualBetAmount: bet.actualBetAmount, executionState: bet.executionState, timer: bet.timer } }
+              ).catch(() => { });
+            }
           }
 
-          if (bet.targetModuleId) {
-            const mod = activeModules.get(bet.targetModuleId);
+          if (failedModuleId) {
+            const mod = activeModules.get(failedModuleId);
             if (mod) {
               mod.isBusy = false;
               mod.busySince = null;

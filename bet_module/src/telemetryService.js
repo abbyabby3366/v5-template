@@ -65,7 +65,7 @@ class TelemetryService {
   /**
    * Submits transaction outcome logs to Central.
    */
-  async reportBetResult(accountLabel, betId, status, reason, betAmount, tableNumber, betType, timer) {
+  async reportBetResult(accountLabel, betId, status, reason, betAmount, tableNumber, betType, timer, attempts, enterAttempts, attemptOutcomes) {
     try {
       await fetch(`${this.centralUrl}/api/telemetry/bet-result`, {
         method: "POST",
@@ -77,7 +77,10 @@ class TelemetryService {
           betAmount,
           tableNumber,
           betType,
-          timer
+          timer,
+          attempts,
+          enterAttempts,
+          attemptOutcomes
         })
       });
     } catch (err) {

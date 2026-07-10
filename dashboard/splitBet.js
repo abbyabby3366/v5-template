@@ -585,8 +585,137 @@ function dispatchSingleBet(splitResult, betEntry, deps) {
   });
 }
 
+/**
+ * Triggers instant failover of a failed bet/sub-bet to the next available module.
+ *
+ * @param {Object} bet            — the bet/sub-bet object
+ * @param {string} failedModuleId — the ID of the module that failed
+ * @param {Map} activeModules     — active modules map
+ * @param {Object} dbCollection   — MongoDB collection (or null)
+ * @returns {Object} { success: boolean, reason?: string, newModuleId?: string }
+ */
+function triggerBetFailover(bet, failedModuleId, activeModules, dbCollection, opts = {}) {
+  const { sendWhatsAppNotification } = require("../utils/whatsapp_notifier");
+
+  // Step 1: Log candidate modules search
+  const online = resolveReadyModules(activeModules, {});
+  const candidateModules = online.filter(m => m.moduleId !== failedModuleId);
+  
+  console.log(`[Central] [FAILOVER STEP 1] Found ${online.length} online modules. Excluding failed module '${failedModuleId}', candidate modules are: [${candidateModules.map(m => m.moduleId).join(', ')}]`);
+
+  if (candidateModules.length === 0) {
+    const noCandMsg = `[FAILOVER ERROR] ❌\nBet ID: ${bet.id}\nTable: ${bet.tableName}\nReason: No online/ready backup modules (excluding failed module '${failedModuleId}').`;
+    console.error(`[Central] ${noCandMsg}`);
+    sendWhatsAppNotification(noCandMsg).catch(e => console.error("WhatsApp error:", e.message));
+    return { success: false, reason: "No other modules online/ready" };
+  }
+
+  // Step 2: Pick any available candidate module
+  let targetModule = candidateModules[Math.floor(Math.random() * candidateModules.length)];
+  const routingDetails = `Selected backup module: ${targetModule.moduleId}`;
+
+  console.log(`[Central] [FAILOVER STEP 2] Routing: ${routingDetails}`);
+
+  const originalModuleLabel = bet.targetModule;
+  const newModuleLabel = (targetModule.accounts && targetModule.accounts[0] && targetModule.accounts[0].label) || targetModule.moduleId;
+
+  // Step 3: Update bet metadata
+  bet.failoverCount = (bet.failoverCount || 0) + 1;
+  bet.failoverHistory = bet.failoverHistory || [];
+  
+  const failoverRecord = {
+    fromModule: originalModuleLabel,
+    toModule: newModuleLabel,
+    time: new Date().toISOString(),
+    failedState: bet.executionState
+  };
+  bet.failoverHistory.push(failoverRecord);
+
+  bet.targetModuleId = targetModule.moduleId;
+  bet.targetModule = newModuleLabel;
+  bet.outcome = "PENDING";
+  bet.actualBetAmount = "-";
+  bet.timer = null;
+  bet.executionState = { status: "PENDING", reason: `Failover attempt #${bet.failoverCount} to ${newModuleLabel}` };
+
+  targetModule.isBusy = true;
+  targetModule.busySince = Date.now();
+
+  console.log(`[Central] [FAILOVER STEP 3] Bet metadata updated. Target changed from '${originalModuleLabel}' to '${newModuleLabel}'. Failover count: ${bet.failoverCount}.`);
+
+  if (dbCollection) {
+    dbCollection.updateOne(
+      { id: bet.id },
+      { 
+        $set: { 
+          targetModuleId: bet.targetModuleId, 
+          targetModule: bet.targetModule,
+          outcome: bet.outcome,
+          actualBetAmount: bet.actualBetAmount,
+          timer: bet.timer,
+          failoverCount: bet.failoverCount,
+          failoverHistory: bet.failoverHistory,
+          executionState: bet.executionState
+        } 
+      }
+    ).catch(() => {});
+  }
+
+  // Step 4: Dispatch the bet to the new module (using /prettygaming/bet)
+  const targetUrl = targetModule.baseUrl + "/prettygaming/bet";
+  const dispatchMsg = `[FAILOVER DISPATCH] 📤\nBet ID: ${bet.id}\nTable: ${bet.tableName}\nPosition: ${bet.target}\nFailed Module: ${failedModuleId}\nReason: ${opts.reason || 'Unknown'}\nBackup Module: ${newModuleLabel}\nURL: ${targetUrl}\nAmount: ${bet.recommendedBetAmount}\nRemaining Timer: ${opts.remainingTimer != null ? opts.remainingTimer + 's' : 'N/A'}`;
+  console.log(`\x1b[35m[Central] [FAILOVER STEP 4] Dispatched at ${new Date().toISOString()} → ${newModuleLabel} | Amount: ${bet.recommendedBetAmount} | Sub-ID: ${bet.id}\x1b[0m`);
+  sendWhatsAppNotification(dispatchMsg).catch(e => console.error("WhatsApp error:", e.message));
+
+  fetch(targetUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(bet)
+  }).then(async (resp) => {
+    if (!resp.ok) {
+      let errMsg = `HTTP ${resp.status}`;
+      try { const body = await resp.json(); errMsg = body.error || errMsg; } catch (e) {}
+      
+      const rejectMsg = `[FAILOVER DISPATCH REJECTED] ⚠️\nBet ID: ${bet.id}\nTable: ${bet.tableName}\nBackup Module: ${newModuleLabel}\nError: ${errMsg}`;
+      console.error(`[Central] [FAILOVER DISPATCH FAILED] ${rejectMsg}`);
+      sendWhatsAppNotification(rejectMsg).catch(e => console.error("WhatsApp error:", e.message));
+
+      bet.outcome = "DISPATCH_FAILED";
+      bet.executionState = { status: "DISPATCH_FAILED", reason: errMsg };
+      targetModule.isBusy = false;
+      targetModule.busySince = null;
+      if (dbCollection) {
+        dbCollection.updateOne(
+          { id: bet.id },
+          { $set: { outcome: bet.outcome, executionState: bet.executionState } }
+        ).catch(() => {});
+      }
+    } else {
+      console.log(`[Central] [FAILOVER STEP 5] Backup module ${newModuleLabel} successfully accepted the failover bet ${bet.id}.`);
+    }
+  }).catch(err => {
+    const errorMsg = `[FAILOVER DISPATCH ERROR] ⚠️\nBet ID: ${bet.id}\nTable: ${bet.tableName}\nBackup Module: ${newModuleLabel}\nError: ${err.message}`;
+    console.error(`[Central] [FAILOVER DISPATCH ERROR] Failed to dispatch failover bet to ${newModuleLabel}:`, err.message);
+    sendWhatsAppNotification(errorMsg).catch(e => console.error("WhatsApp error:", e.message));
+
+    bet.outcome = "NETWORK_ERROR";
+    bet.executionState = { status: "NETWORK_ERROR", reason: err.message };
+    targetModule.isBusy = false;
+    targetModule.busySince = null;
+    if (dbCollection) {
+      dbCollection.updateOne(
+        { id: bet.id },
+        { $set: { outcome: bet.outcome, executionState: bet.executionState } }
+      ).catch(() => {});
+    }
+  });
+
+  return { success: true, newModuleId: targetModule.moduleId };
+}
+
 module.exports = {
   resolveReadyModules,
   resolveSplitBetTargets,
   dispatchBet,
+  triggerBetFailover,
 };
