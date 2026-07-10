@@ -33,6 +33,8 @@ async function launchBrowserSession(acctConfig) {
     launcher = require("../utils/launch_a9");
   } else if (platform === "atas") {
     launcher = require("../utils/launch_atas");
+  } else if (platform === "1xroll") {
+    launcher = require("../utils/launch_1xroll");
   } else {
     launcher = require("../utils/launch_any");
   }

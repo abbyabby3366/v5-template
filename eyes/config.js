@@ -7,6 +7,15 @@ const ACCOUNTS_PATH = path.resolve(__dirname, "json", "eyes_accounts.json");
 const CONFIG_PATH = path.join(__dirname, "..", "dashboard", "config.json");
 
 function getAccountConfig(index = 0) {
+  if (index === 0) {
+    try {
+      const accounts = JSON.parse(fs.readFileSync(ACCOUNTS_PATH, "utf8"));
+      const activeIndex = accounts.findIndex(a => a.run === true);
+      if (activeIndex !== -1) {
+        return buildAccountConfig(activeIndex, ACCOUNTS_PATH);
+      }
+    } catch (e) {}
+  }
   return buildAccountConfig(index, ACCOUNTS_PATH);
 }
 
