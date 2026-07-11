@@ -243,6 +243,30 @@ class TableStateManager {
       const newState = table.state;
       const newRound = table.round;
 
+      // ── Prune future rounds from hand history (safety net for stale state/restored sessions) ──
+      if (newRound > 0 && ts.handHistory && ts.handHistory.length > 0) {
+        const initialLen = ts.handHistory.length;
+        ts.handHistory = ts.handHistory.filter(item => item && item.round < newRound);
+        if (ts.handHistory.length !== initialLen) {
+          console.log(`\x1b[33m[SHOE] ${name}: Cleared future rounds from hand history (R >= ${newRound})\x1b[0m`);
+          ts.lastFinalizedRound = ts.handHistory.length > 0 
+            ? Math.max(...ts.handHistory.map(i => i.round)) 
+            : 0;
+
+          // Rebuild deck composition from remaining valid history
+          ts.deckComposition = freshShoe();
+          for (const item of ts.handHistory) {
+            const allCards = [...(item.playerCards || []), ...(item.bankerCards || [])];
+            for (const card of allCards) {
+              const idx = cardRankToIndex(card);
+              if (idx >= 0 && ts.deckComposition[idx] > 0) {
+                ts.deckComposition[idx]--;
+              }
+            }
+          }
+        }
+      }
+
       // Update tableId if provided
       if (table.tableId) ts.tableId = table.tableId;
 

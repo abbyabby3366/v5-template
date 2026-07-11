@@ -105,7 +105,7 @@ async function syncActualDeckComposition(page, table) {
 // Negative cache: tracks rounds where peer lookup failed, to avoid re-querying.
 // Value is { expiry: timestamp } — skip if Date.now() < expiry.
 const reconcileNegativeCache = new Map();
-const NEGATIVE_CACHE_NOT_FOUND_MS = 5 * 60 * 1000; // 5 minutes for confirmed "not found"
+const NEGATIVE_CACHE_NOT_FOUND_MS = 30 * 1000; // 30 seconds for confirmed "not found"
 const NEGATIVE_CACHE_ERROR_MS = 60 * 1000;          // 60 seconds for timeout/connection errors
 let reconcileRunning = false;
 
@@ -148,7 +148,9 @@ async function checkAndReconcileTables(filteredTables, dynamicConfig) {
 
         if (!deducedItem) {
           needsReconciliation = true;
-        } else if (deducedItem.winner !== expectedWinner) {
+        } else if (!deducedItem.winner || deducedItem.winner !== expectedWinner) {
+          needsReconciliation = true;
+        } else if (!deducedItem.playerCards || deducedItem.playerCards.length < 2 || !deducedItem.bankerCards || deducedItem.bankerCards.length < 2) {
           needsReconciliation = true;
         }
 
@@ -163,7 +165,13 @@ async function checkAndReconcileTables(filteredTables, dynamicConfig) {
         }
 
         try {
-          const res = await fetch(`http://localhost:3456/api/reconcile-round?table=${encodeURIComponent(table.tableName)}&round=${r}`);
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
+          const res = await fetch(
+            `http://localhost:3456/api/reconcile-round?table=${encodeURIComponent(table.tableName)}&round=${r}`,
+            { signal: controller.signal }
+          );
+          clearTimeout(timeoutId);
           const data = await res.json();
 
           if (data.ok && data.cards) {
