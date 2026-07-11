@@ -692,14 +692,7 @@ function startDashboard(stateManager) {
         }
         const round = parseInt(roundStr, 10);
         
-        // 1. Check local state json
-        const localMatch = getRoundCardsFromStateJson(tableName, round);
-        if (localMatch) {
-          res.writeHead(200, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ ok: true, cards: localMatch }));
-          return;
-        }
-        
+
         // 2. Query peer if configured
         const peerUrl = process.env.PEER_CENTRAL_URL;
         if (peerUrl) {
