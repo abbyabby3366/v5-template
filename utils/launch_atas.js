@@ -131,7 +131,8 @@ async function checkPageErrors(page, logger = console) {
           "disconnected",
           "network error",
           "maintenance",
-          "login expired"
+          "login expired",
+          "log in from elsewhere"
         ];
 
         const hasError = errorPatterns.some(pat => lowerText.includes(pat));

@@ -404,7 +404,8 @@ async function launchAccount(acctConfig) {
             lowerText.includes("another device") ||
             lowerText.includes("logged out") ||
             lowerText.includes("kick out") ||
-            lowerText.includes("please login")
+            lowerText.includes("please login") ||
+            lowerText.includes("log in from elsewhere")
           ) {
             logger.warn("Session timeout or disconnect overlay detected — dismissing and reloading...");
             let dismissed = false;
@@ -629,7 +630,8 @@ async function launchAccount(acctConfig) {
                     lowerText.includes("another device") ||
                     lowerText.includes("logged out") ||
                     lowerText.includes("kick out") ||
-                    lowerText.includes("please login")
+                    lowerText.includes("please login") ||
+                    lowerText.includes("log in from elsewhere")
                   ) {
                     logger.warn("Session timeout/disconnect overlay detected. Reloading page...");
                     await sleep(1500);

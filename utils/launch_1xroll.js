@@ -143,7 +143,8 @@ async function checkPageErrors(page, logger = console) {
           "disconnected",
           "network error",
           "maintenance",
-          "login expired"
+          "login expired",
+          "log in from elsewhere"
         ];
 
         const hasError = errorPatterns.some(pat => lowerText.includes(pat));
@@ -287,7 +288,8 @@ async function evaluateState(browser, urls) {
           lowerText.includes("another device") ||
           lowerText.includes("logged out") ||
           lowerText.includes("kick out") ||
-          lowerText.includes("please login")
+          lowerText.includes("please login") ||
+          lowerText.includes("log in from elsewhere")
         ) {
           console.log(`[evaluateState] Session timeout overlay detected — dismissing and reloading...`);
 
